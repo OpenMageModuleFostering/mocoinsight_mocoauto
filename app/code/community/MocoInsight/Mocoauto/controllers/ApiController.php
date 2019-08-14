@@ -529,16 +529,21 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         
             foreach ($attributes as $attribute) {      
                 $attributeCode = $attribute->getAttributeCode();        
-                $value = $attribute->getFrontend()->getValue($_product);
+                try {
+                    $value = $attribute->getFrontend()->getValue($_product);
 
-                switch ($attributeCode){
-                    case 'description':
-                        break;
-                    case 'short_description':
-                        break;
-                    default:
-                        $products[] = array($attributeCode => $value);
-                        break;
+                    switch ($attributeCode){
+                        case 'description':
+                            break;
+                        case 'short_description':
+                            break;
+                        default:
+                            $products[] = array($attributeCode => $value);
+                            break;
+                    }
+                }
+                catch (Exception $e) {
+                    $products[] = array($attributeCode => 'Mocoauto_error: ' . $e->getMessage());
                 }
             }   
         
