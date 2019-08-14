@@ -30,7 +30,7 @@
 //  entityTypeInfoAction
 
 
-define("apiversion","1.4.3");
+define("apiversion","1.4.4");
 
 class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Action
 {
@@ -464,6 +464,10 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                 }
                 $order['payment_method'] = $_order->getPayment()->getMethodInstance()->getTitle();
 
+                $_quote = Mage::getModel('sales/quote')->load($_order->getQuoteId());
+                $taxClassId = $_quote->getCustomerTaxClassId();
+                $_taxClass = Mage::getModel('tax/class')->load($taxClassId);
+                $order['moco_customer_tax_class'] = $_taxClass->getClassName();
 
                 if(is_object($_order->getBillingAddress())){
                     $_billing_address = $_order->getBillingAddress();
@@ -677,6 +681,11 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                         break;
                 }
             }
+
+        $taxClassId = $_customer->getTaxClassId();
+        $taxClass = Mage::getModel('tax/class')->load($taxClassId);
+        $customer['moco_customer_tax_class'] = $taxClass->getClassName();
+
 
         $customers[] = $customer;
         }
@@ -1406,8 +1415,10 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                             'customer_email',                             //attribute_2 with key 1
                         ),
                         array(
-                            array('neq'=>null),                           //condition for attribute_1 with key 0
-                            array('neq'=>null),                           //condition for attribute_2
+                   //         array('neq'=>null),                         //condition for attribute_1 with key 0
+                   //         array('neq'=>null),                         //condition for attribute_2
+                              array('notnull'=>1),                        // This form creates a NOT NULL query. 
+                              array('notnull'=>1),
                         )
                     );
 
@@ -1424,7 +1435,10 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
            $_cartsCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));    // If gte set include records GTE gte
         }
 
+        //Mage::log((string) $_cartsCol->getSelect());
+
         $carts = array();
+
 
         foreach($_cartsCol as $_cart) {
             try {
@@ -1480,6 +1494,8 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         if($entityId != 'ALL'){
            $_cartsCol->addFieldToFilter('entity_id', $entityId);
         }
+
+        //Mage::log((string) $_cartsCol->getSelect());
 
         $carts = array();
 
