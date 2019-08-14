@@ -30,7 +30,7 @@
 //  entityTypeInfoAction
 
 
-define("apiversion","1.4.5");
+define("apiversion","1.4.7");
 
 class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Action
 {
@@ -80,6 +80,98 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return true;
     }
 
+    public function exstatsAction()   // Return the number of Product, Orders and Customers with optional since filter
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $time_start = microtime(true); 
+
+        $currentSystemTime = date('Y-m-d H:i:s', time());
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+        $since = $this->getRequest()->getParam('since','ALL');
+
+        $_productCol = Mage::getModel('catalog/product')->getCollection();
+        if($since != 'ALL'){    
+           $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+        $productcount = $_productCol->getSize();
+            
+        $_orderCol = Mage::getModel('sales/order')->getCollection();
+        if($since != 'ALL'){    
+           $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+        $ordercount = $_orderCol->getSize();
+ 
+        $_customerCol = Mage::getModel('customer/customer')->getCollection();
+        if($since != 'ALL'){    
+           $_customerCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+        $customercount = $_customerCol->getSize();
+
+
+        $_categoryCol = Mage::getModel('catalog/category')->getCollection();
+        if($since != 'ALL'){    
+           $_categoryCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+        $categorycount = $_categoryCol->getSize();
+
+        $_wishlistCol = Mage::getModel('wishlist/wishlist')-> getCollection();
+        if($since != 'ALL'){
+           $_wishlistCol->addFieldToFilter('updated_at', array('gteq' =>$since));
+        }
+        $wishlistcount = $_wishlistCol->getSize();
+
+        $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1');
+        if($since != 'ALL'){
+            $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since));
+	}
+        else{
+           $_cartsCol->addFieldToFilter('items_count', array('neq' => 0));
+        } 
+        
+        $cartscount = $_cartsCol->getSize();
+
+        $_subscriberCol = Mage::getModel('newsletter/subscriber')-> getCollection();
+
+        $subscribercount = $_subscriberCol->getSize();
+
+        $_rulesCol = Mage::getModel('salesrule/rule')->getCollection();
+
+        $rulescount = $_rulesCol->getSize();
+
+
+    $magentoVersion = Mage::getVersion();
+    $moduleversion = (String)Mage::getConfig()->getNode()->modules->MocoInsight_Mocoauto->version;
+    $phpversion = phpversion();
+
+    $stats = array(
+        'success' => 'true',
+        'Since' => $since,
+        'Products' => $productcount,
+        'Orders' => $ordercount,
+        'Customers' => $customercount,
+        'Categories' => $categorycount,
+        'Wish lists' => $wishlistcount,
+        'Unconverted carts' => $cartscount,
+        'Subscribers' => $subscribercount,
+        'Cart and Coupon rules' => $rulescount,
+        'System Date Time' => $currentSystemTime,
+        'Magento Version' => $magentoVersion,
+        'MocoAPI Version' => apiversion,
+        'Module Version' => $moduleversion,
+        'PHP Version' => $phpversion,
+        'API processing time' => (microtime(true) - $time_start)
+         );
+     
+        $this->getResponse()
+            ->setBody(json_encode($stats))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
     public function statsAction()   // Return the number of Product, Orders and Customers with optional since filter
     {
         if(!$this->_authorise()) {
@@ -91,6 +183,10 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $currentSystemTime = date('Y-m-d H:i:s', time());
         $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
         $since = $this->getRequest()->getParam('since','ALL');
+
+//	set to admin 
+
+        Mage::app()->setCurrentStore(Mage_Core_Model_App::ADMIN_STORE_ID);
 
         $_productCol = Mage::getModel('catalog/product')->getCollection();
         if($since != 'ALL'){    
@@ -267,162 +363,6 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
-    public function exstatsAction()   // Return the number of Product, Orders and Customers with optional since filter
-    {
-        if(!$this->_authorise()) {
-            return $this;
-        }
-
-        $time_start = microtime(true); 
-
-        $currentSystemTime = date('Y-m-d H:i:s', time());
-        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-        $since = $this->getRequest()->getParam('since','ALL');
-
-        $_productCol = Mage::getModel('catalog/product')->getCollection();
-        if($since != 'ALL'){    
-           $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
-        }
-        $productcount = $_productCol->getSize();
-            
-        $_orderCol = Mage::getModel('sales/order')->getCollection();
-        if($since != 'ALL'){    
-           $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
-        }
-        $ordercount = $_orderCol->getSize();
- 
-        $_customerCol = Mage::getModel('customer/customer')->getCollection();
-        if($since != 'ALL'){    
-           $_customerCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
-        }
-        $customercount = $_customerCol->getSize();
-
-
-        $_categoryCol = Mage::getModel('catalog/category')->getCollection();
-        if($since != 'ALL'){    
-           $_categoryCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
-        }
-        $categorycount = $_categoryCol->getSize();
-
-        $_wishlistCol = Mage::getModel('wishlist/wishlist')-> getCollection();
-        if($since != 'ALL'){
-           $_wishlistCol->addFieldToFilter('updated_at', array('gteq' =>$since));
-        }
-        $wishlistcount = $_wishlistCol->getSize();
-
-        $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1');
-        if($since != 'ALL'){
-            $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since));
-	}
-        else{
-           $_cartsCol->addFieldToFilter('items_count', array('neq' => 0));
-        } 
-        
-        $cartscount = $_cartsCol->getSize();
-
-        $_subscriberCol = Mage::getModel('newsletter/subscriber')-> getCollection();
-
-        $subscribercount = $_subscriberCol->getSize();
-
-        $_rulesCol = Mage::getModel('salesrule/rule')->getCollection();
-
-        $rulescount = $_rulesCol->getSize();
-
-        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
-
-        if (method_exists($_read, 'showTableStatus')){
-
-            $tablename = 'log_url';
-            if(!$_read ->showTableStatus(trim($tablename,"'"))){
-            $logurlcount = "table does not exist";
-            }
-            else{
-                $query = 'select count(*) AS id from ' . $tablename;
-                $log_urlcount = $_read->fetchOne($query);
-            }
-
-            $tablename = 'log_url_info';
-            if(!$_read ->showTableStatus(trim($tablename,"'"))){
-                $log_url_infocount = "table does not exist";
-            }
-            else{
-                $query = 'select count(*) AS id from ' . $tablename;
-                $log_url_infocount = $_read->fetchOne($query);
-            }
-
-            $tablename = 'log_visitor';
-            if(!$_read ->showTableStatus(trim($tablename,"'"))){
-                $log_visitorcount = "table does not exist";
-            }
-            else{
-                $query = 'select count(*) AS id from ' . $tablename;
-                $log_visitorcount = $_read->fetchOne($query);
-            }
-
-            $tablename = 'log_visitor_info';
-            if(!$_read ->showTableStatus(trim($tablename,"'"))){
-                $log_visitor_infocount = "table does not exist";
-            }
-            else{
-                $query = 'select count(*) AS id from ' . $tablename;
-                $log_visitor_infocount = $_read->fetchOne($query);
-            }
-
-            $tablename = 'log_customer';         // Set the table name here
-            if(!$_read ->showTableStatus(trim($tablename,"'"))){
-                $log_countcount = "table does not exist";
-            }   
-            else{
-                $query = 'select count(*) AS id from ' . $tablename;
-                $log_customercount = $_read->fetchOne($query);
-            }
-        }
-        else {
-            $log_urlcount = "showTableStatus is an undefined method";
-            $log_url_infocount = "showTableStatus is an undefined method";
-            $log_visitorcount = "showTableStatus is an undefined method";
-            $log_visitor_infocount = "showTableStatus is an undefined method";
-            $log_customercount = "showTableStatus is an undefined method";
-
-        }
-
-
-    $magentoVersion = Mage::getVersion();
-    $apiversion = (String)Mage::getConfig()->getNode()->modules->MocoInsight_Mocoauto->version;
-    $phpversion = phpversion();
-
-    $mediaurl = Mage::getBaseUrl('media');
-
-    $stats = array(
-        'success' => 'true',
-        'Since' => $since,
-        'Products' => $productcount,
-        'Orders' => $ordercount,
-        'Customers' => $customercount,
-        'Categories' => $categorycount,
-        'Wish lists' => $wishlistcount,
-        'Unconverted carts' => $cartscount,
-        'Subscribers' => $subscribercount,
-        'Cart and Coupon rules' => $rulescount,
-        'log_url' => $log_urlcount,
-        'log_url_info' => $log_url_infocount,
-        'log_visitor' => $log_visitorcount,
-        'log_visitor_info' => $log_visitor_infocount,
-        'log_customer' => $log_customercount,
-        'System Date Time' => $currentSystemTime,
-        'Magento Version' => $magentoVersion,
-        'MocoAPI Version' => $apiversion,
-        'PHP Version' => $phpversion,
-        'Media URL' => $mediaurl,
-        'API processing time' => (microtime(true) - $time_start)
-         );
-     
-        $this->getResponse()
-            ->setBody(json_encode($stats))
-            ->setHttpResponseCode(200)
-            ->setHeader('Content-type', 'application/json', true);
-        return $this;
-    }
 
     public function ordersAction()
     {
@@ -752,6 +692,9 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $page_size = $this->getRequest()->getParam('page_size', 20);
         $since = $this->getRequest()->getParam('since', 'ALL');
 
+//	Need to set store to admin so as to get all web site products.
+        Mage::app()->setCurrentStore(Mage_Core_Model_App::ADMIN_STORE_ID);
+
         $_categoryCol = Mage::getModel('catalog/category')->getCollection()->addAttributeToSelect('*');
         $_categoryCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
         
@@ -773,7 +716,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
     }
 
 
-    public function productsAction()
+    public function exproductsAction()
     {
         if(!$this->_authorise()) {
             return $this;
@@ -906,6 +849,144 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             ->setHeader('Content-type', 'application/json', true);
         return $this;
     }
+
+    public function productsAction()
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since', 'ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
+
+//	Need to set store to admin so as to get all web site products.
+        Mage::app()->setCurrentStore(Mage_Core_Model_App::ADMIN_STORE_ID);
+
+        $_productCol = Mage::getModel('catalog/product')->getCollection()->addAttributeToSelect('*');
+
+        if($since != 'ALL'){    
+           $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+
+        if($gTE != 'ALL'){
+           $_productCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));
+           $_productCol->getSelect()->limit($page_size, ($offset * $page_size))->order('entity_id');
+        }
+        else{
+           $_productCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
+        }
+
+        $products[] = array('success' => 'true');        
+
+
+        //Mage::log((string) $_productCol->getSelect());
+
+        foreach($_productCol as $_product){
+
+        // get all the custom attributes of the product
+            $attributes = $_product->getAttributes();
+        
+            foreach ($attributes as $attribute) {      
+                $attributeCode = $attribute->getAttributeCode();        
+                
+                switch ($attributeCode){
+                    case 'in_depth':
+		        break;
+                    case 'description':
+                        break;
+                    case 'short_description':
+                        break;
+                    case 'thumbnail':
+                        break;
+                    case 'small_image':
+                        break;
+                    case 'image':
+                        break;
+                    default:
+                        try {
+                            $value = $attribute->getFrontend()->getValue($_product);
+                            $products[] = array($attributeCode => $value); 
+                        }
+                        catch (Exception $e) {
+                            $products[] = array('mocoauto_api_error' => 'product attribute ' . $attributeCode . ' ' . $e->getMessage());
+                        }
+                        break;
+                }
+            }   
+        
+// Get full url to product image
+
+            try{
+                $full_path_url = (string)Mage::helper('catalog/image')->init($_product, 'thumbnail');
+                $products[] = array('thumbnail' => $full_path_url);
+                $full_path_url = (string)Mage::helper('catalog/image')->init($_product, 'small_image');
+                $products[] = array('small_image' => $full_path_url);
+                $full_path_url = (string)Mage::helper('catalog/image')->init($_product, 'image');
+                $products[] = array('image' => $full_path_url);
+            }
+            catch (Exception $e) {
+                $products[] = array('mocoauto_api_error' => 'full path to image error:' . $e->getMessage());
+            }
+ 
+// get all the categories of the product
+
+            $categories = $_product->getCategoryCollection()->addAttributeToSelect('name');
+        
+            foreach ($categories as $category) {      
+                $products[] = array('moco_category' => $category->getID());
+            }
+
+// get inventory information
+
+            try{
+                $stock = Mage::getModel('cataloginventory/stock_item')->loadByProduct($_product);
+
+                $products[] = array('stock_managed' => $stock->getManageStock());
+                $products[] = array('stock_availability' => $stock->getIsInStock());
+            }
+            catch (Exception $e) {
+                $products[] = array('mocoauto_api_error' => 'moco_product_inventory: ' . $e->getMessage());
+            }
+
+// if type is configurable get simple product children
+
+            if($_product->getTypeID() == 'configurable'){
+                //$assocProducts = Mage::getModel('catalog/product_type_configurable')->getUsedProducts(null,$_product);
+                $assocProducts = $_product->getTypeInstance()->getUsedProducts();
+
+                foreach($assocProducts as $assocProduct){
+                    $products[] = array('childProductID' => $assocProduct->getID());
+                }  
+            }
+
+// if type is grouped get associated product children
+
+            if($_product->getTypeID() == 'grouped'){
+
+                $groupedProducts = $_product->getTypeInstance(true)->getAssociatedProducts($_product);
+
+                foreach($groupedProducts as $groupedProduct){
+                    $products[] = array('childProductID' => $groupedProduct->getID());
+
+                }  
+            }
+
+// write end of record mark
+           $products[] = array('moco_end_of_record' => 'True');
+
+        }
+        
+        $this->getResponse()
+            ->setBody(json_encode(array('products' => $products)))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
 
     public function stocklevelsAction()
     {
