@@ -30,7 +30,7 @@
 //  entityTypeInfoAction
 
 
-define("apiversion","1.4.4");
+define("apiversion","1.4.5");
 
 class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Action
 {
@@ -438,17 +438,22 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $gTE = $this->getRequest()->getParam('gte', 'ALL');
 
         $_orderCol = Mage::getModel('sales/order')->getCollection()->addAttributeToSelect('*');
-        $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
-    //    Mage::log('SQL Query: '.$_orderCol->getSelect());
 
         if($since != 'ALL'){    
             $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
 
         if($gTE != 'ALL'){
-            $_orderCol->addAttributeToFilter('entity_id', array('gteq' =>$gTE));
+            $_orderCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));
+            $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('entity_id');
         }
+        else{
+            $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
+        }
+
+        //Mage::log('SQL Query: '.$_orderCol->getSelect());
+
 
         $orders = array();
 
@@ -464,10 +469,11 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                 }
                 $order['payment_method'] = $_order->getPayment()->getMethodInstance()->getTitle();
 
-                $_quote = Mage::getModel('sales/quote')->load($_order->getQuoteId());
-                $taxClassId = $_quote->getCustomerTaxClassId();
-                $_taxClass = Mage::getModel('tax/class')->load($taxClassId);
-                $order['moco_customer_tax_class'] = $_taxClass->getClassName();
+// Removing Tax Class as the customer really wanted VAT number 
+//                $_quote = Mage::getModel('sales/quote')->load($_order->getQuoteId());
+//                $taxClassId = $_quote->getCustomerTaxClassId();
+//                $_taxClass = Mage::getModel('tax/class')->load($taxClassId);
+//                $order['moco_customer_tax_class'] = $_taxClass->getClassName();
 
                 if(is_object($_order->getBillingAddress())){
                     $_billing_address = $_order->getBillingAddress();
@@ -640,14 +646,17 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $gTE = $this->getRequest()->getParam('gte', 'ALL');
 
         $_customerCol = Mage::getModel('customer/customer')->getCollection()->addAttributeToSelect('*');
-        $_customerCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
         if($since != 'ALL'){
             $_customerCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
 
         if($gTE != 'ALL'){
-           $_customerCol->addAttributeToFilter('entity_id', array('gteq' =>$gTE));
+           $_customerCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));
+           $_customerCol->getSelect()->limit($page_size, ($offset * $page_size))->order('entity_id');
+        }
+        else{
+           $_customerCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
         }
 
         $customers = array();
@@ -778,17 +787,23 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $gTE = $this->getRequest()->getParam('gte', 'ALL');
 
         $_productCol = Mage::getModel('catalog/product')->getCollection()->addAttributeToSelect('*');
-        $_productCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
         if($since != 'ALL'){    
            $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
 
         if($gTE != 'ALL'){
-           $_productCol->addAttributeToFilter('entity_id', array('gteq' =>$gTE));
+           $_productCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));
+           $_productCol->getSelect()->limit($page_size, ($offset * $page_size))->order('entity_id');
+        }
+        else{
+           $_productCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
         }
 
         $products[] = array('success' => 'true');        
+
+
+        //Mage::log((string) $_productCol->getSelect());
 
         foreach($_productCol as $_product){
 
