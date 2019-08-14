@@ -13,13 +13,8 @@
 //  categoriesAction
 //  productsAction
 //  stocklevelsAction
-//  log_urlAction
-//  log_url_infoAction
-//  log_url_joinedAction
-//  log_visitorAction
-//  log_visitor_infoAction
-//  log_visitor_joinedAction
-//  log_customerAction
+//  log_all_joinedAction
+//  log_customerAction()
 //  subscribersAction
 //  storesAction
 //  unconvertedcartsAction
@@ -32,9 +27,13 @@
 //  order_idsAction
 //  customer_idsAction
 //  product_idsAction
+//  creditsAction
+//  credit_idsAction
+//  sql_sales_flat_quoteAction()
+//  sql_anytableAction()
 
 
-define("apiversion","1.5.0.4");
+define("apiversion","1.5.1.9");
 
 class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Action
 {
@@ -85,7 +84,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
     }
 
 
-    public function statsAction()   
+    public function ex_statsAction()   
     {
         if(!$this->_authorise()) {
             return $this;
@@ -179,7 +178,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
-    public function test_statsAction()   // test adding edition info
+    public function statsAction()   // test adding edition info
     {
         if(!$this->_authorise()) {
             return $this;
@@ -235,18 +234,28 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $cartscount = $_cartsCol->getSize();
 
         $_subscriberCol = Mage::getModel('newsletter/subscriber')-> getCollection();
-
         $subscribercount = $_subscriberCol->getSize();
 
         $_rulesCol = Mage::getModel('salesrule/rule')->getCollection();
-
         $rulescount = $_rulesCol->getSize();
+
+        $_creditCol = Mage::getModel('sales/order_creditmemo')->getCollection();
+        if($since != 'ALL'){
+           $_creditCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+        $creditcount = $_creditCol->getSize();
 
 
     $magentoVersion = Mage::getVersion();
     $moduleversion = (String)Mage::getConfig()->getNode()->modules->MocoInsight_Mocoauto->version;
     $phpversion = phpversion();
-    $magentoedition = (String)Mage::getEdition();
+
+    if(method_exists('Mage', 'getEdition')){
+        $magentoedition = (String)Mage::getEdition();
+    }
+    else{
+        $magentoedition = 'method Mage::getEdition() unavailable';
+    }
 
     $stats = array(
         'success' => 'true',
@@ -259,6 +268,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         'Unconverted carts' => $cartscount,
         'Subscribers' => $subscribercount,
         'Cart and Coupon rules' => $rulescount,
+        'Credit memos' => $creditcount,
         'System Date Time' => $currentSystemTime,
         'Magento Version' => $magentoVersion,
         'Magento Edition' => $magentoedition,
@@ -468,52 +478,8 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
-    public function exordersAction()
-    {
-        if(!$this->_authorise()) {
-            return $this;
-        }
 
-        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-
-        $offset = $this->getRequest()->getParam('offset', 0);
-        $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since','ALL');
-
-        $_orderCol = Mage::getModel('sales/order')->getCollection()->addAttributeToSelect('*');
-        $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
-
-        if($since != 'ALL'){
-            $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
-        }
-
-        $orders = array();
-
-        foreach($_orderCol as $_order) {
-            $orders[] = $_order->toArray();
-
-
-            if(is_object($_order->getBillingAddress())){
-
-                $_billing_address = $_order->getBillingAddress();
-                $orders[] = $_billing_address->toArray();
-            }
-
-            $_orderItemsCol = $_order->getItemsCollection();
-
-            foreach($_orderItemsCol as $_orderitem){
-                $orders[] = $_orderitem->toArray();
-            }
-        }
-
-        $this->getResponse()
-            ->setBody(json_encode($orders))
-            ->setHttpResponseCode(200)
-            ->setHeader('Content-type', 'application/json', true);
-        return $this;
-    }
-
-    public function ordersAction() 
+    public function ex_ordersAction() 
     {
         if(!$this->_authorise()) {
             return $this;
@@ -602,6 +568,249 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             ->setHeader('Content-type', 'application/json', true);
         return $this;
     }
+
+    public function ordersAction() 
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since','ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
+
+        $_orderCol = Mage::getModel('sales/order')->getCollection()->addAttributeToSelect('*');
+
+
+        if($since != 'ALL'){    
+            $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+
+        if($gTE != 'ALL'){
+            $_orderCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));
+            $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('entity_id');
+        }
+        else{
+            $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
+        }
+
+        //Mage::log('SQL Query: '.$_orderCol->getSelect());
+
+        // Check if the Termnado tables exsists set flag so we read shipments later on.
+        $tablename = 'temando_shipment';
+        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
+
+        if($_read ->isTableExists($tablename)){    //Table does exist
+            $TEMANDO_FLAG='TRUE';
+        }
+
+        $orders = array();
+
+        foreach($_orderCol as $_order) {
+ 
+            $order = array();
+
+            try{
+                $order['moco_start_of_order_record'] = 'True';
+                $orderdetails = array();
+                $orderdetails = $_order->toArray();
+                foreach ($orderdetails as $key => $value) {
+                    $order[$key] = $value;
+                }
+                if(is_object($_order->getPayment()) && method_exists($_order->getPayment()->getMethodInstance(), 'getTitle')){
+                    $order['payment_method'] = $_order->getPayment()->getMethodInstance()->getTitle();
+                }
+                else{
+                    $order['payment_method'] = 'Unable to get payment_method';
+                }
+
+                if(is_object($_order->getBillingAddress())){
+                    $_billing_address = $_order->getBillingAddress();
+                    $billaddrdetails = array();
+                    $billaddrdetails[] = $_billing_address->toArray();
+                    $order['moco_address'] = $billaddrdetails;
+                }
+
+                if(is_object($_order->getShippingAddress())){
+
+                    $_shipping_address = $_order->getShippingAddress();
+                    $shipaddrdetails = array();
+                    $shipaddrdetails[] = $_shipping_address->toArray();
+                    $order['moco_ship_address'] = $shipaddrdetails;
+                }
+
+                $_orderShipmentsCol = $_order->getShipmentsCollection();
+                $ordershipments = array();
+                foreach($_orderShipmentsCol as $_ordershipment){
+                    $ordershipments[] = $_ordershipment->toArray();
+                }
+                $order['moco_shipments'] = $ordershipments;
+              
+ 
+                // If the Temanado flag is set then get any shippiong records that match the order number.
+                if($TEMANDO_FLAG == 'TRUE'){    //Table does exist
+                    $temandodata = array();
+                    $query = 'select id, order_id, anticipated_cost, ready_date, ready_time from ' . $tablename . ' where order_id = "' . $_order->getEntityId() . '"';
+                    //Mage::log('DBG SQL: '. $query);
+                    $readresults = $_read->fetchAll($query);
+                    $temandodata  = $readresults;
+                    $order['moco_temandodata'] = $temandodata;
+                }
+
+
+                $_orderItemsCol = $_order->getItemsCollection();
+                $orderitems = array();
+                foreach($_orderItemsCol as $_orderitem){
+                    $orderitems[] = $_orderitem->toArray();
+                }
+                $order['moco_tls'] = $orderitems;
+
+
+                $order['moco_end_of_order_record'] = 'True';
+            }
+            catch (Exception $e) {
+                $order['mocoauto_api_error'] = 'order record: ' . $e->getMessage();
+            }
+            $orders[] = $order;
+
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($orders))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+//  ordersAction - return all information on a order
+//  1.5.1.9 - only request specified shippment attributes as shipping label can get very big and we don't need it or much else.
+//
+    public function test_ordersAction() 
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since','ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
+
+        $_orderCol = Mage::getModel('sales/order')->getCollection()->addAttributeToSelect('*');
+
+
+        if($since != 'ALL'){    
+            $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+
+        if($gTE != 'ALL'){
+            $_orderCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));
+            $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('entity_id');
+        }
+        else{
+            $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
+        }
+
+        //Mage::log('SQL Query: '.$_orderCol->getSelect());
+
+        // Check if the Termnado tables exsists set flag so we read shipments later on.
+        $tablename = 'temando_shipment';
+        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
+
+        if($_read ->isTableExists($tablename)){    //Table does exist
+            $TEMANDO_FLAG='TRUE';
+        }
+
+        $orders = array();
+
+        foreach($_orderCol as $_order) {
+ 
+            $order = array();
+
+            try{
+                $order['moco_start_of_order_record'] = 'True';
+                $orderdetails = array();
+                $orderdetails = $_order->toArray();
+                foreach ($orderdetails as $key => $value) {
+                    $order[$key] = $value;
+                }
+                if(is_object($_order->getPayment()) && method_exists($_order->getPayment()->getMethodInstance(), 'getTitle')){
+                    $order['payment_method'] = $_order->getPayment()->getMethodInstance()->getTitle();
+                }
+                else{
+                    $order['payment_method'] = 'Unable to get payment_method';
+                }
+
+                if(is_object($_order->getBillingAddress())){
+                    $_billing_address = $_order->getBillingAddress();
+                    $billaddrdetails = array();
+                    $billaddrdetails[] = $_billing_address->toArray();
+                    $order['moco_address'] = $billaddrdetails;
+                }
+
+                if(is_object($_order->getShippingAddress())){
+
+                    $_shipping_address = $_order->getShippingAddress();
+                    $shipaddrdetails = array();
+                    $shipaddrdetails[] = $_shipping_address->toArray();
+                    $order['moco_ship_address'] = $shipaddrdetails;
+                }
+
+
+                if(is_object($_order->getShipmentsCollection())){
+                    $_orderShipmentsCol = $_order->getShipmentsCollection();
+                    $ordershipments = array();
+                    foreach($_orderShipmentsCol as $_ordershipment){
+                        $ordershipments['entity_id'] = $_ordershipment->getEntityId();
+                        $ordershipments['order_id'] = $_ordershipment->getOrderId();
+                        $ordershipments['store_id'] = $_ordershipment->getStoreId();
+                        $ordershipments['increment_id'] = $_ordershipment->getIncrementId();
+                        $ordershipments['created_at'] = $_ordershipment->getCreatedAt();
+                        $ordershipments['updated_at'] = $_ordershipment->getUpdatedAt();
+                    }
+                    $order['moco_shipments'] = $ordershipments;
+                }
+              
+ 
+                // If the Temanado flag is set then get any shippiong records that match the order number.
+                if($TEMANDO_FLAG == 'TRUE'){    //Table does exist
+                    $temandodata = array();
+                    $query = 'select id, order_id, anticipated_cost, ready_date, ready_time from ' . $tablename . ' where order_id = "' . $_order->getEntityId() . '"';
+                    //Mage::log('DBG SQL: '. $query);
+                    $readresults = $_read->fetchAll($query);
+                    $temandodata  = $readresults;
+                    $order['moco_temandodata'] = $temandodata;
+                }
+
+
+                $_orderItemsCol = $_order->getItemsCollection();
+                $orderitems = array();
+                foreach($_orderItemsCol as $_orderitem){
+                    $orderitems[] = $_orderitem->toArray();
+                }
+                $order['moco_tls'] = $orderitems;
+
+
+                $order['moco_end_of_order_record'] = 'True';
+            }
+            catch (Exception $e) {
+                $order['mocoauto_api_error'] = 'order record: ' . $e->getMessage();
+            }
+            $orders[] = $order;
+
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($orders))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
 
 
     public function eavinfo_catalogAction()
@@ -1165,108 +1374,97 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
     }
 
 
-
-    public function log_urlAction()
-    {
-        $tablename = 'log_url';     // Set the table name here
-    
-        if(!$this->_authorise()) {
-            return $this;
-        }
-
-        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-
-        $offset = $this->getRequest()->getParam('offset', 0);
-        $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'ALL');
-
-        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
-
-        if(!$_read ->isTableExists($tablename)){    //Table does not exist
-            $readresults=array($tablename ." table does not exist"); 
-        }           
-        else{
-            $query = 'select * from ' . $tablename . ' limit ' . $offset . ',' . $page_size;
-            $readresults = $_read->fetchAll($query);
-        }
-
-        $this->getResponse()
-            ->setBody(json_encode($readresults))
-            ->setHttpResponseCode(200)
-            ->setHeader('Content-type', 'application/json', true);
-        return $this;
-    }
-
-    public function log_url_infoAction()
-    {
-        $tablename = 'log_url_info';         // Set the table name here
-
-        if(!$this->_authorise()) {
-            return $this;
-        }
-
-        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-
-        $offset = $this->getRequest()->getParam('offset', 0);
-        $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'ALL');
-
-        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
-
-        if(!$_read ->isTableExists($tablename)){    //Table does not exist
-            $readresults=array($tablename ." table does not exist"); 
-        }           
-        else{
-            $query = 'select * from ' . $tablename . ' limit ' . $offset . ',' . $page_size;
-            $readresults = $_read->fetchAll($query);
-        }
-
-        $this->getResponse()
-            ->setBody(json_encode($readresults))
-            ->setHttpResponseCode(200)
-            ->setHeader('Content-type', 'application/json', true);
-        return $this;
-
-    }
-
-    public function log_url_joinedAction()
-    {
-        $tablename1 = 'log_url';         // Set the table name here
-        $tablename2 = 'log_url_info';         // Set the table name here
-
-        if(!$this->_authorise()) {
-            return $this;
-        }
-
-        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-
-        $offset = $this->getRequest()->getParam('offset', 0);
-        $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'ALL');
-
-        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
-
-        if(!$_read ->isTableExists($tablename1)){    //Table does not exist
-            $readresults=array($tablename1 ." table does not exist");
-        }
-        elseif(!$_read ->isTableExists($tablename2)){    //Table does not exist
-            $readresults=array($tablename2 ." table does not exist");
-        }
-        else{
-            $query = 'select visitor_id, visit_time, url, referer from ' . $tablename1 .
-            ' Left join ' . $tablename2 . ' on ' . $tablename1 . '.url_id = ' . $tablename2 . '.url_id where url not like "%mocoauto%"';
-
-            if($since != 'ALL'){
-                $query = $query . ' and visit_time > "' . $since . '"';
-            }
-
-            $query = $query .' limit ' . $offset . ',' . $page_size;
-
-            $readresults = $_read->fetchAll($query);
-        }
-    }
-
     public function log_all_joinedAction()
+    {
+        $tablename1 = 'log_url';
+        $tablename2 = 'log_url_info';
+        $tablename3 = 'log_visitor';
+        $tablename4 = 'log_visitor_info';
+        $tablename5 = 'log_quote';
+        $tablename6 = 'log_customer';
+
+
+
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since', 'ALL');
+        $ipaddr = $this->getRequest()->getParam('ipaddr', 'ALL');
+        $visitid = $this->getRequest()->getParam('visitid', 'ALL');
+
+        try{
+            $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
+            if(!$_read ->showTableStatus(trim($tablename1,"'"))){
+                $readresults=array($tablename1 ." table does not exist");
+            }
+            elseif(!$_read ->showTableStatus(trim($tablename2,"'"))){
+                $readresults=array($tablename2 ." table does not exist");
+            }
+            elseif(!$_read ->showTableStatus(trim($tablename3,"'"))){
+                $readresults=array($tablename3 ." table does not exist");
+            }
+            elseif(!$_read ->showTableStatus(trim($tablename4,"'"))){
+                $readresults=array($tablename4 ." table does not exist");
+            }
+            elseif(!$_read ->showTableStatus(trim($tablename5,"'"))){
+                $readresults=array($tablename5 ." table does not exist");
+            }
+            elseif(!$_read ->showTableStatus(trim($tablename6,"'"))){
+                $readresults=array($tablename6 ." table does not exist");
+            }
+            else{
+                $query = 'select ';
+                $query = $query . $tablename1 . '.url_id, ' . $tablename1 . '.visitor_id, visit_time,';                 //log_url
+                $query = $query . ' url, referer,';                                                                     //log_url_info
+                $query = $query . ' session_id, first_visit_at, last_visit_at, '. $tablename3 . '.store_id,';           //log_visitor
+                $query = $query . ' http_referer, http_user_agent, server_addr, remote_addr,';                          //log_visitor_info
+                $query = $query . ' quote_id,';                                                                         //log_quote
+                $query = $query . ' customer_id';                                                                       //log_customer
+                $query = $query . ' from ' . $tablename1;
+                $query = $query . ' Left join ' . $tablename2 . ' on ' . $tablename1 . '.url_id = ' . $tablename2 . '.url_id';
+                $query = $query . ' Left join ' . $tablename3 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename3 . '.visitor_id';
+                $query = $query . ' Left join ' . $tablename4 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename4 . '.visitor_id';
+                $query = $query . ' Left join ' . $tablename5 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename5 . '.visitor_id';
+                $query = $query . ' Left join ' . $tablename6 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename6 . '.visitor_id where url not like "%mocoauto%"';
+
+
+                if($since != 'ALL'){
+                    $query = $query . ' and visit_time > "' . $since . '"';
+                }
+
+                if($ipaddr != 'ALL'){
+                     $query = $query . ' and remote_addr = "' . ip2long($ipaddr) . '"';
+                }
+
+                if($visitid != 'ALL'){
+                     $query = $query . ' and ' . $tablename1 . '.visitor_id = "' . $visitid . '"';
+                }
+
+                $query = $query .' limit ' . $offset . ',' . $page_size;
+
+                //Mage::log('DBG SQL: '. $query);
+
+                $readresults = $_read->fetchAll($query);
+            }
+        }
+        catch(Exception $e) {
+                $readresults[] = array('mocoauto_api_error' => 'error reading logs all joined: ' . $e->getMessage());
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($readresults))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
+
+    public function ex_log_all_joinedAction()
     {
         $tablename1 = 'log_url';
         $tablename2 = 'log_url_info';
@@ -1283,6 +1481,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
         $since = $this->getRequest()->getParam('since', 'ALL');
+        $ipaddr = $this->getRequest()->getParam('ipaddr', 'ALL');
 
         try{
             $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
@@ -1313,6 +1512,10 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                     $query = $query . ' and visit_time > "' . $since . '"';
                 }
 
+                if($ipaddr != 'ALL'){
+                     $query = $query . ' and remote_addr = "' . ip2long($ipaddr) . '"';
+                }
+
                 $query = $query .' limit ' . $offset . ',' . $page_size;
 
                 //Mage::log('DBG SQL: '. $query);
@@ -1329,196 +1532,199 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             ->setHeader('Content-type', 'application/json', true);
         return $this;
     }
-    public function ex_log_all_joinedAction()
-    {
-        $tablename1 = 'log_url';
-        $tablename2 = 'log_url_info';
-        $tablename3 = 'log_visitor';    
-        $tablename4 = 'log_visitor_info';
 
-
-        if(!$this->_authorise()) {
-            return $this;
-        }
-
-        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-
-        $offset = $this->getRequest()->getParam('offset', 0);
-        $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'ALL');
-
-        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
-
-        if(!$_read ->isTableExists($tablename1)){    //Table does not exist
-            $readresults=array($tablename1 ." table does not exist");
-        }
-        elseif(!$_read ->isTableExists($tablename2)){    //Table does not exist
-            $readresults=array($tablename2 ." table does not exist");
-        }
-        else{
-            $query = 'select '; 
-            $query = $query . $tablename1 . '.url_id, ' . $tablename1 . '.visitor_id, visit_time,';	//log_url
-            $query = $query . ' url, referer,';                                                         //log_url_info
-	    $query = $query . ' session_id, first_visit_at, last_visit_at, store_id,';                  //log_visitor
-            $query = $query . ' http_referer, http_user_agent, server_addr, remote_addr';               //log_visitor_info
-            $query = $query . ' from ' . $tablename1;
-            $query = $query . ' Left join ' . $tablename2 . ' on ' . $tablename1 . '.url_id = ' . $tablename2 . '.url_id';
-            $query = $query . ' Left join ' . $tablename3 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename3 . '.visitor_id';
-            $query = $query . ' Left join ' . $tablename4 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename4 . '.visitor_id where url not like "%mocoauto%"';
-
-            if($since != 'ALL'){
-                $query = $query . ' and visit_time > "' . $since . '"';
-            }
-
-            $query = $query .' limit ' . $offset . ',' . $page_size;
-
-            //Mage::log('DBG SQL: '. $query);
-            $readresults = $_read->fetchAll($query);
-        }
-
-        $this->getResponse()
-            ->setBody(json_encode($readresults))
-            ->setHttpResponseCode(200)
-            ->setHeader('Content-type', 'application/json', true);
-        return $this;
-    }
-
-    public function log_visitorAction()
-    {
-        $tablename = 'log_visitor';         // Set the table name here
-
-        if(!$this->_authorise()) {
-            return $this;
-        }
-
-        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-
-        $offset = $this->getRequest()->getParam('offset', 0);
-        $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'ALL');
-
-        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
-
-        if(!$_read ->isTableExists($tablename)){    //Table does not exist
-            $readresults=array($tablename ." table does not exist"); 
-        }           
-        else{
-            $query = 'select * from ' . $tablename . ' limit ' . $offset . ',' . $page_size;
-            $readresults = $_read->fetchAll($query);
-        }
-
-        $this->getResponse()
-            ->setBody(json_encode($readresults))
-            ->setHttpResponseCode(200)
-            ->setHeader('Content-type', 'application/json', true);
-        return $this;
-    }
-
-    public function log_visitor_infoAction()
-    {
-        $tablename = 'log_visitor_info';         // Set the table name here
-
-        if(!$this->_authorise()) {
-            return $this;
-        }
-
-        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-
-        $offset = $this->getRequest()->getParam('offset', 0);
-        $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'ALL');
-
-        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
-
-        if(!$_read ->isTableExists($tablename)){    //Table does not exist
-            $readresults=array($tablename ." table does not exist"); 
-        }           
-        else{
-            $query = 'select * from ' . $tablename . ' limit ' . $offset . ',' . $page_size;
-            $readresults = $_read->fetchAll($query);
-        }
-
-        $this->getResponse()
-            ->setBody(json_encode($readresults))
-            ->setHttpResponseCode(200)
-            ->setHeader('Content-type', 'application/json', true);
-        return $this;
-   }
-
-
-    public function log_visitor_joinedAction()
-    {
-        $tablename1 = 'log_visitor';         // Set the table name here
-        $tablename2 = 'log_visitor_info';         // Set the table name here
-
-        if(!$this->_authorise()) {
-            return $this;
-        }
-
-        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-
-        $offset = $this->getRequest()->getParam('offset', 0);
-        $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'ALL');
-
-        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
-
-        if(!$_read ->isTableExists($tablename1)){    //Table does not exist
-            $readresults=array($tablename1 ." table does not exist");
-        }
-        elseif(!$_read ->isTableExists($tablename2)){    //Table does not exist
-            $readresults=array($tablename2 ." table does not exist");
-        }
-        else{
-            $query = 'select ' .
-            $tablename1 . '.visitor_id, session_id, first_visit_at, last_visit_at, last_url_id, store_id, http_referer, http_user_agent, remote_addr from '
-             . $tablename1 . ' Left join ' . $tablename2 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename2 . '.visitor_id';
-
-            if($since != 'ALL'){
-                $query = $query . ' where last_vist_at > "' . $since . '"';
-            }
-
-            $query = $query .' limit ' . $offset . ',' . $page_size;
-
-            $readresults = $_read->fetchAll($query);
-        }
-
-        $this->getResponse()
-            ->setBody(json_encode($readresults))
-            ->setHttpResponseCode(200)
-            ->setHeader('Content-type', 'application/json', true);
-        return $this;
-    }
 
     public function log_customerAction()
     {
         $tablename = 'log_customer';         // Set the table name here
-
         if(!$this->_authorise()) {
             return $this;
         }
-
         $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
         $since = $this->getRequest()->getParam('since', 'ALL');
-
         $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
-
         if(!$_read ->isTableExists($tablename)){    //Table does not exist
             $readresults=array($tablename ." table does not exist"); 
         }           
         else{
             $query = 'select * from ' . $tablename;
-
             if($since != 'ALL'){
                 $query = $query . ' where login_at > "' . $since . '"';
             }
-
             $query = $query .' limit ' . $offset . ',' . $page_size;
-
             $readresults = $_read->fetchAll($query);
+        }
+        $this->getResponse()
+            ->setBody(json_encode($readresults))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
+    public function sql_anytableAction()
+    {
+
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 100);
+        $tablename1 = $this->getRequest()->getParam('tablename', 'no table name set');
+
+        try{
+            $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
+            if(!$_read ->showTableStatus(trim($tablename1,"'"))){
+                $readresults=array($tablename1 ." table does not exist");
+            }
+            else{
+                $query = 'select ';
+                $query = $query . '*';                        
+                $query = $query . ' from ' . $tablename1;
+
+                $query = $query .' limit ' . $offset . ',' . $page_size;
+
+                //Mage::log('DBG SQL: '. $query);
+
+                $readresults = $_read->fetchAll($query);
+            }
+        }
+        catch(Exception $e) {
+                $readresults[] = array('mocoauto_api_error' => 'error reading ' . $tablename1 . ' : ' .  $e->getMessage());
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($readresults))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
+    public function old_sql_sales_flat_quoteAction()
+    {
+        $tablename1 = 'sales_flat_quote';
+
+
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 100);
+        $since = $this->getRequest()->getParam('since', 'ALL');
+        $ipaddr = $this->getRequest()->getParam('ipaddr', 'ALL');
+
+        try{
+            $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
+            if(!$_read ->showTableStatus(trim($tablename1,"'"))){
+                $readresults=array($tablename1 ." table does not exist");
+            }
+            else{
+                $query = 'select ';
+                $query = $query . 'entity_id, store_id, created_at, customer_email, remote_ip, reserved_order_id';
+                $query = $query . ' from ' . $tablename1;
+                $query = $query . ' where entity_id > 0';
+
+                if($since != 'ALL'){
+                    $query = $query . ' and created_at > "' . $since . '"';
+                }
+
+                if($ipaddr != 'ALL'){
+                     $query = $query . ' and remote_ip = "' . $ipaddr . '"';
+                }
+
+                $query = $query .' limit ' . $offset . ',' . $page_size;
+
+                //Mage::log('DBG SQL: '. $query);
+
+                $readresults = $_read->fetchAll($query);
+            }
+        }
+        catch(Exception $e) {
+                $readresults[] = array('mocoauto_api_error' => 'error reading ' . $tablename1 . ' : ' .  $e->getMessage());
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($readresults))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
+    public function sql_sales_flat_quoteAction()
+    {
+        $tablename1 = 'sales_flat_quote';
+        $tablename2 = 'sales_flat_quote_item';
+
+
+
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 100);
+        $since = $this->getRequest()->getParam('since', 'ALL');
+        $ipaddr = $this->getRequest()->getParam('ipaddr', 'ALL');
+
+        try{
+            $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
+            if(!$_read ->showTableStatus(trim($tablename1,"'"))){
+                $readresults=array($tablename1 ." table does not exist");
+            }
+            elseif(!$_read ->showTableStatus(trim($tablename2,"'"))){
+                $readresults=array($tablename2 ." table does not exist");
+            }
+            else{
+                $query = 'select ';
+                $query = $query . $tablename1 . '.entity_id, ';                       // sales_flat_quote
+                $query = $query . $tablename1 . '.store_id, ';                        // sales_flat_quote
+                $query = $query . $tablename1 . '.created_at, ';                      // sales_flat_quote
+                $query = $query . $tablename1 . '.updated_at, ';                      // sales_flat_quote
+                $query = $query . $tablename1 . '.converted_at, ';                    // sales_flat_quote
+                $query = $query . $tablename1 . '.customer_email, ';                  // sales_flat_quote
+                $query = $query . $tablename1 . '.remote_ip, ';                       // sales_flat_quote
+                $query = $query . $tablename1 . '.reserved_order_id, ';               // sales_flat_quote
+                $query = $query . $tablename1 . '.is_active, ';                       // sales_flat_quote
+
+                $query = $query . $tablename2 . '.item_id, ';                         // sales_flat_quote_item
+                $query = $query . $tablename2 . '.quote_id, ';                        // sales_flat_quote_item
+                $query = $query . $tablename2 . '.product_id, ';                      // sales_flat_quote_item
+                $query = $query . $tablename2 . '.store_id, ';                        // sales_flat_quote_item
+                $query = $query . $tablename2 . '.parent_item_id, ';                  // sales_flat_quote_item
+                $query = $query . $tablename2 . '.product_type, ';                    // sales_flat_quote_item
+                $query = $query . $tablename2 . '.qty,';                              // sales_flat_quote_item
+                $query = $query . $tablename2 . '.price';                             // sales_flat_quote_item
+
+                $query = $query . ' from ' . $tablename1;
+                $query = $query . ' Left join ' . $tablename2 . ' on ' . $tablename1 . '.entity_id = ' . $tablename2 . '.quote_id';
+                $query = $query . ' where ' . $tablename1 . '.entity_id > 0';
+
+                if($since != 'ALL'){
+                    $query = $query . ' and ' . $tablename1 . '.updated_at > "' . $since . '"';
+                }
+
+                if($ipaddr != 'ALL'){
+                     $query = $query . ' and remote_ip = "' . $ipaddr . '"';
+                }
+
+                $query = $query .' limit ' . $offset . ',' . $page_size;
+
+                // Mage::log('DBG SQL: '. $query);
+
+                $readresults = $_read->fetchAll($query);
+            }
+        }
+        catch(Exception $e) {
+                $readresults[] = array('mocoauto_api_error' => 'error reading ' . $tablename1 . ' : ' .  $e->getMessage());
         }
 
         $this->getResponse()
@@ -1636,7 +1842,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
-    public function unconvertedcartsAction()
+    public function ex01_unconvertedcartsAction()
     {
         if(!$this->_authorise()) {
             return $this;
@@ -1759,7 +1965,8 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             ->setHeader('Content-type', 'application/json', true);
         return $this;
     }
-    public function test_unconvertedcartsAction()
+
+    public function ex_unconvertedcartsAction()
     {
         if(!$this->_authorise()) {
             return $this;
@@ -1772,15 +1979,15 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $since = $this->getRequest()->getParam('since', 'ALL');
         $gTE = $this->getRequest()->getParam('gte', 'ALL');
 
+        Mage::app()->setCurrentStore(Mage_Core_Model_App::ADMIN_STORE_ID); //	set to admin view all sites and stores
+
         $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1'); // 1 = quote has not been conveted to an order
 
         $magentoVersion = Mage::getVersion();
         if (version_compare($magentoVersion, '1.7', '>=')){
-            //Mage::log("Version is above check"); 
             $aboveVersion17Flag = 1;
         } 
         else {
-            //Mage::log("Version is below check");             
             $aboveVersion17Flag = 0;
         }
 
@@ -1798,10 +2005,10 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         }
 
         if($since != 'ALL'){
-            $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since)); // If no date filter include empty carts
+            $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since)); // If date filter supplied include empty carts
         }
         else{
-           $_cartsCol->addFieldToFilter('items_count', array('neq' => 0));     // If date filter supplied only include carts with items
+            $_cartsCol->addFieldToFilter('items_count', array('neq' => 0));     // If no date filter supplied (ALL) only include carts with items
         }
 
         // If using gte we want to sort by entity id
@@ -1885,8 +2092,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
-
-    public function ex_unconvertedcartsAction()//This query returns only no empty carts when no dat filter applied
+    public function unconvertedcartsAction()
     {
         if(!$this->_authorise()) {
             return $this;
@@ -1897,45 +2103,113 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
         $since = $this->getRequest()->getParam('since', 'ALL');
-        $entityId = $this->getRequest()->getParam('entity_id', 'ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
 
-        $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1');
-        $_cartsCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
+        Mage::app()->setCurrentStore(Mage_Core_Model_App::ADMIN_STORE_ID); //   set to admin view all sites and stores
+
+        $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1'); // 1 = quote has not been conveted to an order
+
+        $magentoVersion = Mage::getVersion();
+        if (version_compare($magentoVersion, '1.7', '>=')){
+            $aboveVersion17Flag = 1; 
+        }
+        else {
+            $aboveVersion17Flag = 0;
+        }
+
+        if($aboveVersion17Flag){                                          // This will only work with Magento > 1.6
+            $_cartsCol->addFieldToFilter(                                 // If there is no email or customer id we dont want the cart.
+                        array(
+                            'customer_id',                                //attribute_1 with key 0
+                            'customer_email',                             //attribute_2 with key 1
+                        ),
+                        array(
+                              array('gteq'=> 1),                        // This form creates a NOT NULL query. 
+                              array('notnull'=>1),
+                        )
+                    );
+        }
 
         if($since != 'ALL'){
-            $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since));
+            $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since)); // If date filter supplied include empty carts
         }
         else{
-           $_cartsCol->addFieldToFilter('items_count', array('neq' => 0));
-        } 
-  
-        if($entityId != 'ALL'){
-           $_cartsCol->addFieldToFilter('entity_id', $entityId);
+            $_cartsCol->addFieldToFilter('items_count', array('neq' => 0));     // If no date filter supplied (ALL) only include carts with items
+        }
+
+        // If using gte we want to sort by entity id
+
+        if($gTE != 'ALL'){
+           $_cartsCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));    // If gte set include records GTE gte
+           $_cartsCol->getSelect()->limit($page_size, ($offset * $page_size))->order('entity_id');
+        }
+        else{
+           $_cartsCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
         }
 
         //Mage::log((string) $_cartsCol->getSelect());
 
         $carts = array();
 
-        foreach($_cartsCol as $_cart) {
-            try {
-                $carts[] = array('moco_start_of_cart_record' => 'True');
-                $carts[] = $_cart->toArray();
-                $_cartItemsCol = $_cart -> getItemsCollection();
 
-                foreach($_cartItemsCol as $_cartitem){
-                    $carts[] = array('product_id'  => $_cartitem->getProductId());
-                    $carts[] = array('product_sku'  => $_cartitem->getSku());
-                    $carts[] = array('product_qty' => $_cartitem->getQty());
-                    $carts[] = array('updated_at'  => $_cartitem->getUpdatedAt());
-                    $carts[] = array('product_type' => $_cartitem->getProductType());
-                    //$carts[] = $_cartitem->toArray();
+        foreach($_cartsCol as $_cart) {
+            $cart = array();
+
+            try {
+                $cart['moco_start_of_cart_record'] = 'True';
+                $cartdetails = array();
+
+                if(!$aboveVersion17Flag && !$_cart->getCustomerId() && !$_cart->getCustomerEmail()){
+                    //Mage::log($_cart->getEntityId() . " " . $_cart->getCustomerEmail() . " " .  $_cart->getCustomerId());
+                    $cart['moco_no_cart_identification_information'] = 'True';
                 }
-                $carts[] = array('moco_end_of_cart_record' => 'True');
+                else{
+                    $cartdetails = $_cart->toArray();
+
+                    foreach ($cartdetails as $key =>$value){
+                        $cart[$key] = $value;
+                    }
+
+                    $_cartItemsCol = $_cart -> getItemsCollection();
+                    $cartitems = array();
+
+                    foreach($_cartItemsCol as $_cartitem){
+                        $cartitem = array();
+                        try{
+                            $cartitem['item_id']              = $_cartitem->getItemId();
+                            $cartitem['parent_id']            = $_cartitem->getParentId();
+                            $cartitem['product_id']           = $_cartitem->getProductId();
+                            $cartitem['product_sku']          = $_cartitem->getSku();
+                            $cartitem['product_qty']          = $_cartitem->getQty();
+                            $cartitem['updated_at']           = $_cartitem->getUpdatedAt();
+                            $cartitem['product_name']         = $_cartitem->getName();
+                            $cartitem['product_type']         = $_cartitem->getProductType();
+                            $cartitem['base_price']           = $_cartitem->getBasePrice();
+                            $cartitem['base_tax_amount']      = $_cartitem->getBaseTaxAmount();
+                            $cartitem['base_discount_amount'] = $_cartitem->getBaseDiscountAmount();
+                            $cartitem['base_cost']            = $_cartitem->getBaseCost();
+                            $cartitem['base_price_incl_tax']  = $_cartitem->getBasePriceInclTax();
+                        }
+
+                        catch(Exception $e) {
+                            $cartitem['mocoauto_api_error'] = 'moco_unable_to_read_cartitem: ' . $e->getMessage();
+                        }
+
+                        $cartitems[] = $cartitem;
+                    }
+
+                    $cart['moco_cart_items'] = $cartitems;
+                }
+
+                $cart['moco_end_of_cart_record'] = 'True';
+
             }
             catch(Exception $e) {
-                    $carts[] = array('mocoauto_api_error' => 'moco_unable_to_read_cart: ' . $e->getMessage());
+                $cart['mocoauto_api_error'] = 'moco_unable_to_read_cart: ' . $e->getMessage();
             }
+
+            $carts[] = $cart;
+
         }
 
         $this->getResponse()
@@ -1944,6 +2218,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             ->setHeader('Content-type', 'application/json', true);
         return $this;
     }
+
 
     public function wishlistsAction()
     {
@@ -2115,4 +2390,98 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
+
+    public function creditsAction() 
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since','ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
+
+        $_creditCol = Mage::getModel('sales/order_creditmemo')->getCollection()->addAttributeToSelect('*');
+
+
+        if($since != 'ALL'){    
+            $_creditCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+
+        if($gTE != 'ALL'){
+            $_creditCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));
+            $_creditCol->getSelect()->limit($page_size, ($offset * $page_size))->order('entity_id');
+        }
+        else{
+            $_creditCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
+        }
+
+        //Mage::log('SQL Query: '.$_orderCol->getSelect());
+
+
+        $credits = array();
+
+        foreach($_creditCol as $_credit) {
+ 
+            $credit = array();
+
+            try{
+                $credit['moco_start_of_credit_record'] = 'True';
+                $creditdetails = array();
+                $creditdetails = $_credit->toArray();
+
+                foreach ($creditdetails as $key => $value) {
+                    $credit[$key] = $value;
+                }
+
+
+                $_creditItemsCol = $_credit->getItemsCollection();
+                $credititems = array();
+
+                foreach($_creditItemsCol as $_credititem){
+                    $credititems[] = $_credititem->toArray();
+                }
+                $credit['moco_tls'] = $credititems;
+
+
+                $order['moco_end_of_credit_record'] = 'True';
+            }
+            catch (Exception $e) {
+                $order['mocoauto_api_error'] = 'credit record: ' . $e->getMessage();
+            }
+            $credits[] = $credit;
+
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($credits))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
+
+
+    public function credit_idsAction()
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+
+        $creditIds = Mage::getModel('sales/order_creditmemo')->getCollection()->getAllIds($limit= $page_size, $offset =($offset * $page_size));
+
+        $this->getResponse()
+            ->setBody(json_encode($creditIds))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
 }
