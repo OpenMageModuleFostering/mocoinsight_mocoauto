@@ -79,8 +79,161 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         return true;
     }
-
     public function statsAction()   // Return the number of Product, Orders and Customers with optional since filter
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $time_start = microtime(true); 
+
+        $currentSystemTime = date('Y-m-d H:i:s', time());
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+        $since = $this->getRequest()->getParam('since','All');
+
+        $_productCol = Mage::getModel('catalog/product')->getCollection();
+        if($since != 'All'){    
+           $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+        $productcount = $_productCol->getSize();
+            
+        $_orderCol = Mage::getModel('sales/order')->getCollection();
+        if($since != 'All'){    
+           $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+        $ordercount = $_orderCol->getSize();
+ 
+        $_customerCol = Mage::getModel('customer/customer')->getCollection();
+        if($since != 'All'){    
+           $_customerCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+        $customercount = $_customerCol->getSize();
+
+
+        $_categoryCol = Mage::getModel('catalog/category')->getCollection();
+        if($since != 'All'){    
+           $_categoryCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+        $categorycount = $_categoryCol->getSize();
+
+        $_wishlistCol = Mage::getModel('wishlist/wishlist')-> getCollection();
+        if($since != 'All'){
+           $_wishlistCol->addFieldToFilter('updated_at', array('gteq' =>$since));
+        }
+        $wishlistcount = $_wishlistCol->getSize();
+
+        $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1');
+        if($since != 'All'){
+            $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since));
+	}
+        else{
+           $_cartsCol->addFieldToFilter('items_count', array('neq' => 0));
+        } 
+        
+        $cartscount = $_cartsCol->getSize();
+
+        $_subscriberCol = Mage::getModel('newsletter/subscriber')-> getCollection();
+
+        $subscribercount = $_subscriberCol->getSize();
+
+        $_rulesCol = Mage::getModel('salesrule/rule')->getCollection();
+
+        $rulescount = $_rulesCol->getSize();
+
+        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
+
+        if (method_exists($_read, 'showTableStatus')){
+
+            $tablename = 'log_url';
+            if(!$_read ->showTableStatus(trim($tablename,"'"))){
+            $logurlcount = "table does not exist";
+            }
+            else{
+                $query = 'select count(*) AS id from ' . $tablename;
+                $log_urlcount = $_read->fetchOne($query);
+            }
+
+            $tablename = 'log_url_info';
+            if(!$_read ->showTableStatus(trim($tablename,"'"))){
+                $log_url_infocount = "table does not exist";
+            }
+            else{
+                $query = 'select count(*) AS id from ' . $tablename;
+                $log_url_infocount = $_read->fetchOne($query);
+            }
+
+            $tablename = 'log_visitor';
+            if(!$_read ->showTableStatus(trim($tablename,"'"))){
+                $log_visitorcount = "table does not exist";
+            }
+            else{
+                $query = 'select count(*) AS id from ' . $tablename;
+                $log_visitorcount = $_read->fetchOne($query);
+            }
+
+            $tablename = 'log_visitor_info';
+            if(!$_read ->showTableStatus(trim($tablename,"'"))){
+                $log_visitor_infocount = "table does not exist";
+            }
+            else{
+                $query = 'select count(*) AS id from ' . $tablename;
+                $log_visitor_infocount = $_read->fetchOne($query);
+            }
+
+            $tablename = 'log_customer';         // Set the table name here
+            if(!$_read ->showTableStatus(trim($tablename,"'"))){
+                $log_countcount = "table does not exist";
+            }   
+            else{
+                $query = 'select count(*) AS id from ' . $tablename;
+                $log_customercount = $_read->fetchOne($query);
+            }
+        }
+        else {
+            $log_urlcount = "showTableStatus is an undefined method";
+            $log_url_infocount = "showTableStatus is an undefined method";
+            $log_visitorcount = "showTableStatus is an undefined method";
+            $log_visitor_infocount = "showTableStatus is an undefined method";
+            $log_customercount = "showTableStatus is an undefined method";
+
+        }
+
+
+    $magentoVersion = Mage::getVersion();
+    $apiversion = (String)Mage::getConfig()->getNode()->modules->MocoInsight_Mocoauto->version;
+    $phpversion = phpversion();
+
+    $stats = array(
+        'success' => 'true',
+        'Since' => $since,
+        'Products' => $productcount,
+        'Orders' => $ordercount,
+        'Customers' => $customercount,
+        'Categories' => $categorycount,
+        'Wish lists' => $wishlistcount,
+        'Unconverted carts' => $cartscount,
+        'Subscribers' => $subscribercount,
+        'Cart and Coupon rules' => $rulescount,
+        'log_url' => $log_urlcount,
+        'log_url_info' => $log_url_infocount,
+        'log_visitor' => $log_visitorcount,
+        'log_visitor_info' => $log_visitor_infocount,
+        'log_customer' => $log_customercount,
+        'System Date Time' => $currentSystemTime,
+        'Magento Version' => $magentoVersion,
+        'MocoAPI Version' => $apiversion,
+        'PHP Version' => $phpversion,
+        'API processing time' => (microtime(true) - $time_start)
+         );
+     
+        $this->getResponse()
+            ->setBody(json_encode($stats))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
+    public function exstatsAction()   // Return the number of Product, Orders and Customers with optional since filter
     {
         if(!$this->_authorise()) {
             return $this;
@@ -248,158 +401,6 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
-    public function exstatsAction()
-    {
-        if(!$this->_authorise()) {
-            return $this;
-        }
-
-        $currentSystemTime = date('Y-m-d H:i:s', time());
-        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-        $since = $this->getRequest()->getParam('since','All');
-
-        $_productCol = Mage::getModel('catalog/product')->getCollection();
-        if($since != 'All'){    
-           $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
-        }
-        $productcount = $_productCol->getSize();
-            
-        $_orderCol = Mage::getModel('sales/order')->getCollection();
-        if($since != 'All'){    
-           $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
-        }
-        $ordercount = $_orderCol->getSize();
- 
-        $_customerCol = Mage::getModel('customer/customer')->getCollection();
-        if($since != 'All'){    
-           $_customerCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
-        }
-        $customercount = $_customerCol->getSize();
-
-
-        $_categoryCol = Mage::getModel('catalog/category')->getCollection();
-        if($since != 'All'){    
-           $_categoryCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
-        }
-        $categorycount = $_categoryCol->getSize();
-
-        $_wishlistCol = Mage::getModel('wishlist/wishlist')-> getCollection();
-        if($since != 'All'){
-           $_wishlistCol->addFieldToFilter('updated_at', array('gteq' =>$since));
-        }
-        $wishlistcount = $_wishlistCol->getSize();
-
-        $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1');
-
-        if($since != 'All'){
-            $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since));
-        }
-        $cartscount = $_cartsCol->getSize();
-
-        $_subscriberCol = Mage::getModel('newsletter/subscriber')-> getCollection();
-
-        $subscribercount = $_subscriberCol->getSize();
-//
-//  Check size of log files
-//  1. Check if isTableExists method is defined (It appears Magento v1.5.0.1 defines it differently)
-//  2. Then check if each table exists
-//  3. Then get size of the 5 tables.
-
-
-        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
-
-        if (method_exists($_read, 'isTableExists')){
-
-            $tablename = 'log_url';         // Set the table name here
-
-            if(!$_read ->isTableExists($tablename)){        //Table does not exist
-                $logurlcount = "table does not exist";
-            }
-            else{
-                $query = 'select count(*) AS id from ' . $tablename;
-                $log_urlcount = $_read->fetchOne($query);
-            }
-
-            $tablename = 'log_url_info';         // Set the table name here
-
-            if(!$_read ->isTableExists($tablename)){        //Table does not exist
-                $log_url_infocount = "table does not exist";
-            }
-            else{
-                $query = 'select count(*) AS id from ' . $tablename;
-                $log_url_infocount = $_read->fetchOne($query);
-            }
-
-            $tablename = 'log_visitor';         // Set the table name here
-
-            if(!$_read ->isTableExists($tablename)){        //Table does not exist
-                $log_visitorcount = "table does not exist";
-            }
-            else{
-                $query = 'select count(*) AS id from ' . $tablename;
-                $log_visitorcount = $_read->fetchOne($query);
-            }
-
-            $tablename = 'log_visitor_info';         // Set the table name here
-
-            if(!$_read ->isTableExists($tablename)){        //Table does not exist
-                $log_visitor_infocount = "table does not exist";
-            }
-            else{
-                $query = 'select count(*) AS id from ' . $tablename;
-                $log_visitor_infocount = $_read->fetchOne($query);
-            }
-
-            $tablename = 'log_customer';         // Set the table name here
-
-            if(!$_read ->isTableExists($tablename)){        //Table does not exist
-                $log_countcount = "table does not exist";
-            }   
-            else{
-                $query = 'select count(*) AS id from ' . $tablename;
-                $log_customercount = $_read->fetchOne($query);
-            }
-
-        }
-        else {
-            $log_urlcount = "isTableExists is an undefined method";
-            $log_url_infocount = "isTableExists is an undefined method";
-            $log_visitorcount = "isTableExists is an undefined method";
-            $log_visitor_infocount = "isTableExists is an undefined method";
-            $log_customercount = "isTableExists is an undefined method";
-
-        }
-
-    $magentoVersion = Mage::getVersion();
-    $apiversion = (String)Mage::getConfig()->getNode()->modules->MocoInsight_Mocoauto->version;
-
-    $stats = array(
-        'success' => 'true',
-        'Since' => $since,
-        'Products' => $productcount,
-        'Orders' => $ordercount,
-        'Customers' => $customercount,
-        'Categories' => $categorycount,
-        'Wish lists' => $wishlistcount,
-        'Unconverted carts' => $cartscount,
-        'Subscribers' => $subscribercount,
-        'log_url' => $log_urlcount,
-        'log_url_info' => $log_url_infocount,
-        'log_visitor' => $log_visitorcount,
-        'log_visitor_info' => $log_visitor_infocount,
-        'log_customer' => $log_customercount,
-        'System Date Time' => $currentSystemTime,
-        'Magento Version' => $magentoVersion,
-        'MocoAPI Version' => $apiversion
-         );
-     
-        $this->getResponse()
-            ->setBody(json_encode($stats))
-            ->setHttpResponseCode(200)
-            ->setHeader('Content-type', 'application/json', true);
-        return $this;
-    }
-
 
     public function ordersAction()
     {
@@ -451,7 +452,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                     $orders[] = array('moco_end_of_paymentinfo' => 'True');
                 }
                 catch (Exception $e) {
-                    $orders[] = array('billing info' => 'Mocoauto_error: ' . $e->getMessage());
+                    $orders[] = array('mocoauto_api_error' => 'Billing info error: ' . $e->getMessage());
                 } 
                 $_orderItemsCol = $_order->getItemsCollection();
 
@@ -461,7 +462,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                 $orders[] = array('moco_end_of_order_record' => 'True');
             }
             catch (Exception $e) {
-                $orders[] = array('order record' => 'Mocoauto_error: ' . $e->getMessage());
+                $orders[] = array('mocoauto_api_error' => 'order record: ' . $e->getMessage());
             }
         }
 
@@ -627,7 +628,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                     }
                 }
                 catch (Exception $e) {
-                    $products[] = array($attributeCode => 'Mocoauto_error: ' . $e->getMessage());
+                    $products[] = array('mocoauto_api_error' => 'product attribute ' . $attributeCode . ' ' . $e->getMessage());
                 }
             }   
         
@@ -649,7 +650,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                 $products[] = array('stock_availability' => $stock->getIsInStock());
             }
             catch (Exception $e) {
-                $products[] = array('moco_product_inventory' => 'Mocoauto_error: ' . $e->getMessage());
+                $products[] = array('mocoauto_api_error' => 'moco_product_inventory: ' . $e->getMessage());
             }
 
 
@@ -892,10 +893,73 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
     public function log_all_joinedAction()
     {
-        $tablename1 = 'log_url';         // Set the table name here
-        $tablename2 = 'log_url_info';         // Set the table name here
-        $tablename3 = 'log_visitor';         // Set the table name here
-        $tablename4 = 'log_visitor_info';         // Set the table name here
+        $tablename1 = 'log_url';
+        $tablename2 = 'log_url_info';
+        $tablename3 = 'log_visitor';    
+        $tablename4 = 'log_visitor_info';
+
+
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since', 'All');
+
+        try{
+            $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
+            if(!$_read ->showTableStatus(trim($tablename1,"'"))){
+                $readresults=array($tablename1 ." table does not exist");
+            } 
+            elseif(!$_read ->showTableStatus(trim($tablename2,"'"))){
+                $readresults=array($tablename2 ." table does not exist");
+            }
+            elseif(!$_read ->showTableStatus(trim($tablename3,"'"))){
+                $readresults=array($tablename3 ." table does not exist");
+            }
+            elseif(!$_read ->showTableStatus(trim($tablename4,"'"))){
+                $readresults=array($tablename4 ." table does not exist");
+            }
+            else{
+                $query = 'select '; 
+                $query = $query . $tablename1 . '.url_id, ' . $tablename1 . '.visitor_id, visit_time,';	    //log_url
+                $query = $query . ' url, referer,';                                                         //log_url_info
+	        $query = $query . ' session_id, first_visit_at, last_visit_at, store_id,';                  //log_visitor
+                $query = $query . ' http_referer, http_user_agent, server_addr, remote_addr';               //log_visitor_info
+                $query = $query . ' from ' . $tablename1;
+                $query = $query . ' Left join ' . $tablename2 . ' on ' . $tablename1 . '.url_id = ' . $tablename2 . '.url_id';
+                $query = $query . ' Left join ' . $tablename3 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename3 . '.visitor_id';
+                $query = $query . ' Left join ' . $tablename4 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename4 . '.visitor_id where url not like "%mocoauto%"';
+
+                if($since != 'All'){
+                    $query = $query . ' and visit_time > "' . $since . '"';
+                }
+
+                $query = $query .' limit ' . $offset . ',' . $page_size;
+
+                //Mage::log('DBG SQL: '. $query);
+                $readresults = $_read->fetchAll($query);
+            }
+        }
+        catch(Exception $e) {
+                $readresults[] = array('mocoauto_api_error' => 'error reading logs all joined: ' . $e->getMessage());
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($readresults))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+    public function exlog_all_joinedAction()
+    {
+        $tablename1 = 'log_url';
+        $tablename2 = 'log_url_info';
+        $tablename3 = 'log_visitor';    
+        $tablename4 = 'log_visitor_info';
 
 
         if(!$this->_authorise()) {
@@ -1188,7 +1252,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                 $carts[] = array('moco_end_of_cart_record' => 'True');
             }
             catch(Exception $e) {
-                    $carts[] = array('moco_unable_to_read_cart' => 'Mocoauto_error: ' . $e->getMessage());
+                    $carts[] = array('mocoauto_api_error' => 'moco_unable_to_read_cart: ' . $e->getMessage());
             }
         }
 
