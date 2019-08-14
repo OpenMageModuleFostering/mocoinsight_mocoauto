@@ -323,7 +323,10 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
 	$_categoryCol = Mage::getModel('catalog/category')->getCollection()->addAttributeToSelect('*');
         $_categoryCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
-        $_categoryCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        
+	if($since != 'All'){	
+           $_categoryCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
 
 	$categories = array();
 
@@ -358,6 +361,11 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
            $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
 
+// Grab an array of tax rates for lookup later
+
+        //$taxClasses  = Mage::helper("core")->jsonDecode( Mage::helper("tax")->getAllRatesByProductClass() );
+	$store = Mage::app()->getStore('default');
+	$request = Mage::getSingleton('tax/calculation')->getRateRequest(null, null, null, $store);
 
         $products = array();
 	$products[] = array('success' => 'true');	     
@@ -387,6 +395,20 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
 		    }	
 	    
+
+// get the tax rate of the product
+
+
+		   $taxclassid = $_product->getData('tax_class_id');
+		   if(isset($taxClasses["value_".$taxclassid])){
+		   	$taxpercent = $taxClasses["value_".$taxclassid];
+		   } else {
+		   	$taxpercent = 'not defined';
+		   }
+
+		   $taxpercent = Mage::getSingleton('tax/calculation')->getRate($request->setProductClassId($taxclassid));
+		   $products[] = array('moco_TaxRate:' => $taxpercent);
+
 
 // get all the categories of the product
 
@@ -664,17 +686,17 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         foreach (Mage::app()->getWebsites() as $_website) {
     		foreach ($_website->getGroups() as $group) {
-			$stores[] = array($_website->getName() => $_website->getId());
+			$stores[] = array('website name' => $_website->getName(), 'website Id' => $_website->getId());
         		$_stores = $group->getStores();
         		foreach ($_stores as $_store) {
 
-		                $stores[] = $_store->toArray();
-
+		                $storeInfo = $_store->toArray();
+		                $storeInfo['tax/calculation/price_includes_tax'] = Mage::getStoreConfig('tax/calculation/price_includes_tax', $_store->getStoreId());
+                                $storeInfo['tax/defaults/country'] = Mage::getStoreConfig('tax/defaults/country', $_store->getStoreId());
+				$stores[] = $storeInfo;
         		}
     		}
 	}	
-
-
 
         $this->getResponse()
             ->setBody(json_encode($stores))
