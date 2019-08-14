@@ -514,14 +514,9 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
            $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
 
-// Grab an array of tax rates for lookup later
 
-
-        $store = Mage::app()->getStore('default');
-        $request = Mage::getSingleton('tax/calculation')->getRateRequest(null, null, null, $store);
-
-        $products = array();
         $products[] = array('success' => 'true');        
+
         foreach($_productCol as $_product){
 
 // get all the attributes of the product
@@ -533,6 +528,8 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                     $value = $attribute->getFrontend()->getValue($_product);
 
                     switch ($attributeCode){
+                        case 'in_depth':
+			    break;
                         case 'description':
                             break;
                         case 'short_description':
@@ -548,19 +545,6 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             }   
         
 
-// get the tax rate of the product
-
-            $taxclassid = $_product->getData('tax_class_id');
-            if(isset($taxClasses["value_".$taxclassid])){
-                $taxpercent = $taxClasses["value_".$taxclassid];
-            } 
-            else {
-                $taxpercent = 'not defined';
-            }
-
-            $taxpercent = Mage::getSingleton('tax/calculation')->getRate($request->setProductClassId($taxclassid));
-            $products[] = array('moco_TaxRate:' => $taxpercent);
-
 // get all the categories of the product
 
             $categories = $_product->getCategoryCollection()->addAttributeToSelect('name');
@@ -571,15 +555,27 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
 // if type is configurable get simple product children
 
-
-
             if($_product->getTypeID() == 'configurable'){
-                $assocProductIDs = Mage::getModel('catalog/product_type_configurable')->getUsedProducts(null,$_product);
+                //$assocProducts = Mage::getModel('catalog/product_type_configurable')->getUsedProducts(null,$_product);
+                $assocProducts = $_product->getTypeInstance()->getUsedProducts();
 
-                foreach($assocProductIDs as $assocProduct){
+                foreach($assocProducts as $assocProduct){
                     $products[] = array('childProductID' => $assocProduct->getID());
                 }  
             }
+
+// if type is grouped get associated product children
+
+            if($_product->getTypeID() == 'grouped'){
+
+                $groupedProducts = $_product->getTypeInstance(true)->getAssociatedProducts($_product);
+
+                foreach($groupedProducts as $groupedProduct){
+                    $products[] = array('ChildProductID' => $groupedProduct->getID());
+
+                }  
+            }
+
 // write end of record mark
            $products[] = array('moco_end_of_record' => 'True');
 
@@ -933,6 +929,51 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $carts = array();
 
         foreach($_cartsCol as $_cart) {
+            try {
+                $carts[] = array('moco_start_of_cart_record' => 'True');
+                $carts[] = $_cart->toArray();
+                $_cartItemsCol = $_cart -> getItemsCollection();
+
+                foreach($_cartItemsCol as $_cartitem){
+                    $carts[] = array('product_id'  => $_cartitem->getProductId());
+                    $carts[] = array('product_qty' => $_cartitem->getQty());
+                    $carts[] = array('updated_at'  => $_cartitem->getUpdatedAt());
+                }
+                $carts[] = array('moco_end_of_cart_record' => 'True');
+            }
+            catch(Exception $e) {
+                    $carts[] = array('moco_unable_to_read_cart' => 'Mocoauto_error: ' . $e->getMessage());
+            }
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($carts))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+    public function exunconvertedcartsAction()
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since', 'All');
+
+        $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1');
+        $_cartsCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
+
+        if($since != 'All'){
+           $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since));
+        }
+
+        $carts = array();
+
+        foreach($_cartsCol as $_cart) {
             $carts[] = array('moco_start_of_cart_record' => 'True');
             $carts[] = $_cart->toArray();
             $_cartItemsCol = $_cart -> getItemsCollection();
@@ -1011,10 +1052,54 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $installinfo[] = array('Home URL' => Mage::getBaseDir());
         
 
+
+        $calc = Mage::getSingleton('tax/calculation');
+        $rates = $calc->getRatesForAllProductTaxClasses($calc->getRateRequest());
+
+        foreach ($rates as $class=>$rate) {
+           $installinfo[] = array('Tax rate' => floatval($rate));
+        }
+
         $this->getResponse()
             ->setBody(json_encode($installinfo))
             ->setHttpResponseCode(200)
             ->setHeader('Content-type', 'application/json', true);
         return $this;
     }
+
+    public function rulesAction()
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since', 'All');
+
+        $_rulesCol = Mage::getModel('salesrule/rule')->getCollection();
+
+
+        foreach ($_rulesCol as $rule) {
+            // print_r($rule->getData());
+            $rulelist[] = array('moco_start_of_rule_record' => 'True');
+            $rulelist[] = array('rule_id' => $rule->getRule_id());
+            $rulelist[] = array('rule_name' => $rule->getName());
+            $rulelist[] = array('rule_description' => $rule->getDescription());
+            $rulelist[] = array('rule_from_date' => $rule->getFrom_date());
+            $rulelist[] = array('rule_to_date' => $rule->getTo_date());
+            $rulelist[] = array('rule_is_active' => $rule->getIsActive());
+            $rulelist[] = array('rule_coupon_type' => $rule->getCoupon_type());
+            $rulelist[] = array('moco_end_of_rule_record' => 'True');
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($rulelist))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
 }
