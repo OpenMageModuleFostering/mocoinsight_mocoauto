@@ -90,41 +90,41 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $currentSystemTime = date('Y-m-d H:i:s', time());
         $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-        $since = $this->getRequest()->getParam('since','All');
+        $since = $this->getRequest()->getParam('since','ALL');
 
         $_productCol = Mage::getModel('catalog/product')->getCollection();
-        if($since != 'All'){    
+        if($since != 'ALL'){    
            $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
         $productcount = $_productCol->getSize();
             
         $_orderCol = Mage::getModel('sales/order')->getCollection();
-        if($since != 'All'){    
+        if($since != 'ALL'){    
            $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
         $ordercount = $_orderCol->getSize();
  
         $_customerCol = Mage::getModel('customer/customer')->getCollection();
-        if($since != 'All'){    
+        if($since != 'ALL'){    
            $_customerCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
         $customercount = $_customerCol->getSize();
 
 
         $_categoryCol = Mage::getModel('catalog/category')->getCollection();
-        if($since != 'All'){    
+        if($since != 'ALL'){    
            $_categoryCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
         $categorycount = $_categoryCol->getSize();
 
         $_wishlistCol = Mage::getModel('wishlist/wishlist')-> getCollection();
-        if($since != 'All'){
+        if($since != 'ALL'){
            $_wishlistCol->addFieldToFilter('updated_at', array('gteq' =>$since));
         }
         $wishlistcount = $_wishlistCol->getSize();
 
         $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1');
-        if($since != 'All'){
+        if($since != 'ALL'){
             $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since));
 	}
         else{
@@ -182,7 +182,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $currentSystemTime = date('Y-m-d H:i:s', time());
         $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-        $since = $this->getRequest()->getParam('since','All');
+        $since = $this->getRequest()->getParam('since','ALL');
 
 
         $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
@@ -276,41 +276,41 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $currentSystemTime = date('Y-m-d H:i:s', time());
         $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-        $since = $this->getRequest()->getParam('since','All');
+        $since = $this->getRequest()->getParam('since','ALL');
 
         $_productCol = Mage::getModel('catalog/product')->getCollection();
-        if($since != 'All'){    
+        if($since != 'ALL'){    
            $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
         $productcount = $_productCol->getSize();
             
         $_orderCol = Mage::getModel('sales/order')->getCollection();
-        if($since != 'All'){    
+        if($since != 'ALL'){    
            $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
         $ordercount = $_orderCol->getSize();
  
         $_customerCol = Mage::getModel('customer/customer')->getCollection();
-        if($since != 'All'){    
+        if($since != 'ALL'){    
            $_customerCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
         $customercount = $_customerCol->getSize();
 
 
         $_categoryCol = Mage::getModel('catalog/category')->getCollection();
-        if($since != 'All'){    
+        if($since != 'ALL'){    
            $_categoryCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
         $categorycount = $_categoryCol->getSize();
 
         $_wishlistCol = Mage::getModel('wishlist/wishlist')-> getCollection();
-        if($since != 'All'){
+        if($since != 'ALL'){
            $_wishlistCol->addFieldToFilter('updated_at', array('gteq' =>$since));
         }
         $wishlistcount = $_wishlistCol->getSize();
 
         $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1');
-        if($since != 'All'){
+        if($since != 'ALL'){
             $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since));
 	}
         else{
@@ -433,13 +433,18 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since','All');
+        $since = $this->getRequest()->getParam('since','ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
 
         $_orderCol = Mage::getModel('sales/order')->getCollection()->addAttributeToSelect('*');
         $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
-        if($since != 'All'){    
+        if($since != 'ALL'){    
             $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+
+        if($gTE != 'ALL'){
+            $_orderCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));
         }
 
         $orders = array();
@@ -447,44 +452,46 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         foreach($_orderCol as $_order) {
 
             try{
-                $orders[] = array('moco_start_of_order_record' => 'True');
-                $orders[] = $_order->toArray();
+                $order = array();
+                $order['moco_start_of_order_record'] = 'True';
+                $orderdetails = array();
+                $orderdetails = $_order->toArray();
+                foreach ($orderdetails as $key => $value) {
+                    $order[$key] = $value;
+                }
+                $order['payment_method'] = $_order->getPayment()->getMethodInstance()->getTitle();
+
 
                 if(is_object($_order->getBillingAddress())){
-
                     $_billing_address = $_order->getBillingAddress();
-                    $orders[] = array('moco_start_of_address' => 'True');
-                    $orders[] = $_billing_address->toArray();
-                    $orders[] = array('moco_end_of_address' => 'True');
+                    $billaddrdetails = array();
+                    $billaddrdetails[] = $_billing_address->toArray();
+                    $order['moco_address'] = $billaddrdetails;
                 }
 
-                try{
-                    $_payment_info = $_order->getPayment();
-                    $orders[] = array('moco_start_of_paymentinfo' => 'True');
-                    $paymentinfo[] = $_payment_info->toArray();
-		    foreach($paymentinfo as $key => $value){
-                        unset($paymentinfo[$key]['cc_number_enc']);
-                        unset($paymentinfo[$key]['cc_last4']);
-                        unset($paymentinfo[$key]['cc_exp_month']);
-                        unset($paymentinfo[$key]['cc_exp_year']);
-                    }
-                    $orders[] = array($paymentinfo);
+                if(is_object($_order->getShippingAddress())){
 
-                    $orders[] = array('moco_end_of_paymentinfo' => 'True');
+                    $_shipping_address = $_order->getShippingAddress();
+                    $shipaddrdetails = array();
+                    $shipaddrdetails[] = $_shipping_address->toArray();
+                    $order['moco_ship_address'] = $shipaddrdetails;
                 }
-                catch (Exception $e) {
-                    $orders[] = array('mocoauto_api_error' => 'Billing info error: ' . $e->getMessage());
-                } 
+
                 $_orderItemsCol = $_order->getItemsCollection();
-
+                $orderitems = array();
                 foreach($_orderItemsCol as $_orderitem){
-                    $orders[] = $_orderitem->toArray();
-                } 
-                $orders[] = array('moco_end_of_order_record' => 'True');
+                    $orderitems[] = $_orderitem->toArray();
+                }
+                $order['moco_tls'] = $orderitems;
+
+
+                $order['moco_end_of_order_record'] = 'True';
             }
             catch (Exception $e) {
-                $orders[] = array('mocoauto_api_error' => 'order record: ' . $e->getMessage());
+                $order['mocoauto_api_error'] = 'order record: ' . $e->getMessage();
             }
+            $orders[] = $order;
+
         }
 
         $this->getResponse()
@@ -504,12 +511,12 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since','All');
+        $since = $this->getRequest()->getParam('since','ALL');
 
         $_orderCol = Mage::getModel('sales/order')->getCollection()->addAttributeToSelect('*');
         $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
-        if($since != 'All'){
+        if($since != 'ALL'){
             $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
 
@@ -560,6 +567,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
   
+
     public function customersAction()
     {
         if(!$this->_authorise()) {
@@ -570,13 +578,18 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
 
         $_customerCol = Mage::getModel('customer/customer')->getCollection()->addAttributeToSelect('*');
         $_customerCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
-        if($since != 'All'){
+        if($since != 'ALL'){
             $_customerCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+
+        if($gTE != 'ALL'){
+           $_customerCol->addAttributeToFilter('entity_id', array('gteq' =>$gTE));
         }
 
         $customers = array();
@@ -633,12 +646,12 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_customerCol = Mage::getModel('customer/customer')->getCollection()->addAttributeToSelect('*');
         $_customerCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
-        if($since != 'All'){    
+        if($since != 'ALL'){    
             $_customerCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
 
@@ -665,12 +678,12 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_categoryCol = Mage::getModel('catalog/category')->getCollection()->addAttributeToSelect('*');
         $_categoryCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
         
-        if($since != 'All'){    
+        if($since != 'ALL'){    
             $_categoryCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
 
@@ -697,15 +710,14 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_productCol = Mage::getModel('catalog/product')->getCollection()->addAttributeToSelect('*');
         $_productCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
-        if($since != 'All'){    
+        if($since != 'ALL'){    
            $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
-
 
         $products[] = array('success' => 'true');        
 
@@ -805,15 +817,19 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
 
         $_productCol = Mage::getModel('catalog/product')->getCollection()->addAttributeToSelect('*');
         $_productCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
-        if($since != 'All'){    
+        if($since != 'ALL'){    
            $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
 
+        if($gTE != 'ALL'){
+           $_productCol->addAttributeToFilter('entity_id', array('gteq' =>$gTE));
+        }
 
         $products[] = array('success' => 'true');        
 
@@ -850,149 +866,6 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                 }
             }   
         
-// Get full url to product image
-
-            try{
-                $full_path_url = (string)Mage::helper('catalog/image')->init($_product, 'thumbnail');
-                $products[] = array('thumbnail' => $full_path_url);
-                $full_path_url = (string)Mage::helper('catalog/image')->init($_product, 'small_image');
-                $products[] = array('small_image' => $full_path_url);
-                $full_path_url = (string)Mage::helper('catalog/image')->init($_product, 'image');
-                $products[] = array('image' => $full_path_url);
-            }
-            catch (Exception $e) {
-                $products[] = array('mocoauto_api_error' => 'full path to image error:' . $e->getMessage());
-            }
- 
-// get all the categories of the product
-
-            $categories = $_product->getCategoryCollection()->addAttributeToSelect('name');
-        
-            foreach ($categories as $category) {      
-                $products[] = array('moco_category' => $category->getID());
-            }
-
-// get inventory information
-
-            try{
-                $stock = Mage::getModel('cataloginventory/stock_item')->loadByProduct($_product);
-
-                $products[] = array('stock_managed' => $stock->getManageStock());
-                $products[] = array('stock_availability' => $stock->getIsInStock());
-            }
-            catch (Exception $e) {
-                $products[] = array('mocoauto_api_error' => 'moco_product_inventory: ' . $e->getMessage());
-            }
-
-
-// if type is configurable get simple product children
-
-            if($_product->getTypeID() == 'configurable'){
-                //$assocProducts = Mage::getModel('catalog/product_type_configurable')->getUsedProducts(null,$_product);
-                $assocProducts = $_product->getTypeInstance()->getUsedProducts();
-
-                foreach($assocProducts as $assocProduct){
-                    $products[] = array('childProductID' => $assocProduct->getID());
-                }  
-            }
-
-// if type is grouped get associated product children
-
-            if($_product->getTypeID() == 'grouped'){
-
-                $groupedProducts = $_product->getTypeInstance(true)->getAssociatedProducts($_product);
-
-                foreach($groupedProducts as $groupedProduct){
-                    $products[] = array('childProductID' => $groupedProduct->getID());
-
-                }  
-            }
-
-
-
-
-// write end of record mark
-           $products[] = array('moco_end_of_record' => 'True');
-
-        }
-        
-        $this->getResponse()
-            ->setBody(json_encode(array('products' => $products)))
-            ->setHttpResponseCode(200)
-            ->setHeader('Content-type', 'application/json', true);
-        return $this;
-    }
-
-    public function testproductsAction()
-    {
-        if(!$this->_authorise()) {
-            return $this;
-        }
-
-        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-
-        $offset = $this->getRequest()->getParam('offset', 0);
-        $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
-
-        $_productCol = Mage::getModel('catalog/product')->getCollection()->addAttributeToSelect('*');
-        $_productCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
-
-        if($since != 'All'){    
-           $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
-        }
-
-
-        $products = array('success' => 'true');        
-
-        // Let's try and dump the whole product
-
-        foreach($_productCol as $_product){
-            $product = array();
-            $product[] = $_product->toArray();
-
-        // get all the custom attributes of the product
-            $attributes = $_product->getAttributes();
-        
-            foreach ($attributes as $attribute) {      
-                $attributeCode = $attribute->getAttributeCode();        
-                
-                switch ($attributeCode){
-                    case 'in_depth':
-		        break;
-                    case 'description':
-                        break;
-                    case 'short_description':
-                        break;
-                    case 'thumbnail':
-                        break;
-                    case 'small_image':
-                        break;
-                    case 'image':
-                        break;
-                    default:
-                        try {
-                            $frontendinput = $attribute->getFrontendInput();
-                            $frontendvalue = $attribute->getFrontend()->getValue($_product);
-                            $textvalue = $_product->getData($attributeCode);
-                            $attrtextvalue = $_product->getAttributeText($attributeCode);
-                            $product[$attributeCode.' -frontend_input'] = $frontendinput;
-                            $product[$attributeCode.' -frontend'] = $frontendvalue;
-                            $product[$attributeCode.' -text'] = $textvalue;
-                            $product[$attributeCode.' -attrtext'] = $attrtextvalue;
-
- 
-                        }
-                        catch (Exception $e) {
-                            $product['mocoauto_api_error'] = 'product attribute ' . $attributeCode . ' ' . $e->getMessage();
-                        }
-                        break;
-                }
-            }   
-        
-            $products[] = $product; 
-
-
 // Get full url to product image
 
             try{
@@ -1109,7 +982,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
 
@@ -1140,7 +1013,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
 
@@ -1173,7 +1046,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
 
@@ -1187,7 +1060,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             $query = 'select visitor_id, visit_time, url, referer from ' . $tablename1 .
             ' Left join ' . $tablename2 . ' on ' . $tablename1 . '.url_id = ' . $tablename2 . '.url_id where url not like "%mocoauto%"';
 
-            if($since != 'All'){
+            if($since != 'ALL'){
                 $query = $query . ' and visit_time > "' . $since . '"';
             }
 
@@ -1213,7 +1086,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         try{
             $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
@@ -1240,7 +1113,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                 $query = $query . ' Left join ' . $tablename3 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename3 . '.visitor_id';
                 $query = $query . ' Left join ' . $tablename4 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename4 . '.visitor_id where url not like "%mocoauto%"';
 
-                if($since != 'All'){
+                if($since != 'ALL'){
                     $query = $query . ' and visit_time > "' . $since . '"';
                 }
 
@@ -1276,7 +1149,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
 
@@ -1297,7 +1170,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             $query = $query . ' Left join ' . $tablename3 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename3 . '.visitor_id';
             $query = $query . ' Left join ' . $tablename4 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename4 . '.visitor_id where url not like "%mocoauto%"';
 
-            if($since != 'All'){
+            if($since != 'ALL'){
                 $query = $query . ' and visit_time > "' . $since . '"';
             }
 
@@ -1326,7 +1199,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
 
@@ -1357,7 +1230,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
 
@@ -1390,7 +1263,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
 
@@ -1405,7 +1278,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             $tablename1 . '.visitor_id, session_id, first_visit_at, last_visit_at, last_url_id, store_id, http_referer, http_user_agent, remote_addr from '
              . $tablename1 . ' Left join ' . $tablename2 . ' on ' . $tablename1 . '.visitor_id = ' . $tablename2 . '.visitor_id';
 
-            if($since != 'All'){
+            if($since != 'ALL'){
                 $query = $query . ' where last_vist_at > "' . $since . '"';
             }
 
@@ -1433,7 +1306,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
 
@@ -1443,7 +1316,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         else{
             $query = 'select * from ' . $tablename;
 
-            if($since != 'All'){
+            if($since != 'ALL'){
                 $query = $query . ' where login_at > "' . $since . '"';
             }
 
@@ -1459,7 +1332,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
-    public function subscribersAction()
+    public function exsubscribersAction()
     {
         if(!$this->_authorise()) {
             return $this;
@@ -1469,10 +1342,52 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_subscribersCol = Mage::getModel('newsletter/subscriber')->getCollection(); //->addAttributeToSelect('*');
         $_subscribersCol->getSelect()->limit($page_size, ($offset * $page_size));    //->order('updated_at');
+
+        $subscribers = array();
+
+        foreach($_subscribersCol as $_subscriber) {
+            $subscribers[] = $_subscriber->toArray();
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($subscribers))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
+    public function subscribersAction()
+    {
+/*      STATUS_NOT_ACTIVE = 2
+        STATUS_SUBSCRIBED = 1
+        STATUS_UNCONFIRMED = 4
+        STATUS_UNSUBSCRIBED = 3                        */
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since', 'ALL');
+        $subscriber_status= $this->getRequest()->getParam('status', 'ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
+
+        $_subscribersCol = Mage::getModel('newsletter/subscriber')->getCollection(); 
+        $_subscribersCol->getSelect()->limit($page_size, ($offset * $page_size));   
+
+        if($subscriber_status != 'ALL'){
+           $_subscribersCol->addFieldToFilter('subscriber_status', $subscriber_status);
+        }
+
+        if($gTE != 'ALL'){
+            $_subscribersCol->addFieldToFilter('subscriber_id', array('gteq' =>$gTE));
+        }
 
         $subscribers = array();
 
@@ -1503,8 +1418,16 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             $_stores = $group->getStores();
             foreach ($_stores as $_store) {
               $storeInfo = $_store->toArray();
-              $storeInfo['tax/calculation/price_includes_tax'] = Mage::getStoreConfig('tax/calculation/price_includes_tax', $_store->getStoreId());
-              $storeInfo['tax/defaults/country'] = Mage::getStoreConfig('tax/defaults/country', $_store->getStoreId());
+              $storeID = $_store->getStoreId();
+              $storeInfo['tax/calculation/price_includes_tax'] = Mage::getStoreConfig('tax/calculation/price_includes_tax', $storeID);
+              $storeInfo['tax/defaults/country'] = Mage::getStoreConfig('tax/defaults/country', $storeID);
+              $storeInfo['URL_TYPE_DIRECT_LINK'] =  Mage::app()->getStore($storeID)->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_DIRECT_LINK);
+              $storeInfo['URL_TYPE_JS'] =  Mage::app()->getStore($storeID)->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_JS);
+              $storeInfo['URL_TYPE_LINK'] =  Mage::app()->getStore($storeID)->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_LINK);
+              $storeInfo['URL_TYPE_MEDIA'] =  Mage::app()->getStore($storeID)->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_MEDIA);
+              $storeInfo['URL_TYPE_SKIN'] =  Mage::app()->getStore($storeID)->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_SKIN);
+              $storeInfo['URL_TYPE_WEB'] =  Mage::app()->getStore($storeID)->getBaseUrl(Mage_Core_Model_Store::URL_TYPE_WEB);
+
               $stores[] = $storeInfo;
             }
           }
@@ -1517,7 +1440,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
-    public function unconvertedcartsAction()//This query returns only no empty carts when no dat filter applied
+    public function unconvertedcartsAction()
     {
         if(!$this->_authorise()) {
             return $this;
@@ -1527,18 +1450,36 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
 
-        $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1');
+        $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1'); // 1 = quote has not been conveted to an order
+
+
+        $_cartsCol->addFieldToFilter(                                     // If there is no email or customer id we dont want the cart.
+                        array(
+                            'customer_id',                                //attribute_1 with key 0
+                            'customer_email',                             //attribute_2 with key 1
+                        ),
+                        array(
+                            array('neq'=>Null),                           //condition for attribute_1 with key 0
+                            array('neq'=>null),                           //condition for attribute_2
+                        )
+                    );
+
         $_cartsCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
-        if($since != 'All'){
-            $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since));
+        if($since != 'ALL'){
+            $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since)); // If no date filter include empty carts
         }
         else{
-           $_cartsCol->addFieldToFilter('items_count', array('neq' => 0));
-        } 
-  
+           $_cartsCol->addFieldToFilter('items_count', array('neq' => 0));     // If date filter supplied only include carts with items
+        }
+
+        if($gTE != 'ALL'){
+           $_cartsCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));    // If gte set include records GTE gte
+        }
+
         $carts = array();
 
         foreach($_cartsCol as $_cart) {
@@ -1568,7 +1509,8 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             ->setHeader('Content-type', 'application/json', true);
         return $this;
     }
-    public function exunconvertedcartsAction()
+
+    public function exunconvertedcartsAction()//This query returns only no empty carts when no dat filter applied
     {
         if(!$this->_authorise()) {
             return $this;
@@ -1578,29 +1520,44 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
+        $entityId = $this->getRequest()->getParam('entity_id', 'ALL');
 
         $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1');
         $_cartsCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
-        if($since != 'All'){
-           $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since));
+        if($since != 'ALL'){
+            $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since));
+        }
+        else{
+           $_cartsCol->addFieldToFilter('items_count', array('neq' => 0));
+        } 
+  
+        if($entityId != 'ALL'){
+           $_cartsCol->addFieldToFilter('entity_id', $entityId);
         }
 
         $carts = array();
 
         foreach($_cartsCol as $_cart) {
-            $carts[] = array('moco_start_of_cart_record' => 'True');
-            $carts[] = $_cart->toArray();
-            $_cartItemsCol = $_cart -> getItemsCollection();
-    
-            foreach($_cartItemsCol as $_cartitem){
-                //$carts[] = $_cartitem->toArray();
-                $carts[] = array('product_id'  => $_cartitem->getProductId());
-                $carts[] = array('product_qty' => $_cartitem->getQty());
-                $carts[] = array('updated_at'  => $_cartitem->getUpdatedAt());
+            try {
+                $carts[] = array('moco_start_of_cart_record' => 'True');
+                $carts[] = $_cart->toArray();
+                $_cartItemsCol = $_cart -> getItemsCollection();
+
+                foreach($_cartItemsCol as $_cartitem){
+                    $carts[] = array('product_id'  => $_cartitem->getProductId());
+                    $carts[] = array('product_sku'  => $_cartitem->getSku());
+                    $carts[] = array('product_qty' => $_cartitem->getQty());
+                    $carts[] = array('updated_at'  => $_cartitem->getUpdatedAt());
+                    $carts[] = array('product_type' => $_cartitem->getProductType());
+                    //$carts[] = $_cartitem->toArray();
+                }
+                $carts[] = array('moco_end_of_cart_record' => 'True');
             }
-            $carts[] = array('moco_end_of_cart_record' => 'True');
+            catch(Exception $e) {
+                    $carts[] = array('mocoauto_api_error' => 'moco_unable_to_read_cart: ' . $e->getMessage());
+            }
         }
 
         $this->getResponse()
@@ -1620,12 +1577,12 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_wishlistCol = Mage::getModel('wishlist/wishlist')-> getCollection();
         $_wishlistCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
-        if($since != 'All'){
+        if($since != 'ALL'){
            $_wishlistCol->addFieldToFilter('updated_at', array('gteq' =>$since));
         }
 
@@ -1695,7 +1652,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $offset = $this->getRequest()->getParam('offset', 0);
         $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'All');
+        $since = $this->getRequest()->getParam('since', 'ALL');
 
         $_rulesCol = Mage::getModel('salesrule/rule')->getCollection();
 
