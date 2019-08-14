@@ -8,6 +8,7 @@
 //
 //  statsAction     
 //  ordersAction
+//  ordersNoPaymentAction for trollweb Norwegan clients.
 //  customersAction
 //  categoriesAction
 //  productsAction
@@ -26,11 +27,14 @@
 //  installinfoAction
 //  rulesAction
 //  eavinfo_catalogAction
-//  attrInfoAction
-//  entityTypeInfoAction
+//  attrinfoAction
+//  entitytypeinfoAction
+//  order_idsAction
+//  customer_idsAction
+//  product_idsAction
 
 
-define("apiversion","1.4.7");
+define("apiversion","1.5.0.4");
 
 class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Action
 {
@@ -80,7 +84,8 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return true;
     }
 
-    public function exstatsAction()   // Return the number of Product, Orders and Customers with optional since filter
+
+    public function statsAction()   
     {
         if(!$this->_authorise()) {
             return $this;
@@ -91,6 +96,8 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $currentSystemTime = date('Y-m-d H:i:s', time());
         $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
         $since = $this->getRequest()->getParam('since','ALL');
+
+        Mage::app()->setCurrentStore(Mage_Core_Model_App::ADMIN_STORE_ID); //	set to admin view all sites and stores
 
         $_productCol = Mage::getModel('catalog/product')->getCollection();
         if($since != 'ALL'){    
@@ -172,7 +179,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
-    public function statsAction()   // Return the number of Product, Orders and Customers with optional since filter
+    public function test_statsAction()   // test adding edition info
     {
         if(!$this->_authorise()) {
             return $this;
@@ -184,9 +191,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
         $since = $this->getRequest()->getParam('since','ALL');
 
-//	set to admin 
-
-        Mage::app()->setCurrentStore(Mage_Core_Model_App::ADMIN_STORE_ID);
+        Mage::app()->setCurrentStore(Mage_Core_Model_App::ADMIN_STORE_ID); //	set to admin view all sites and stores
 
         $_productCol = Mage::getModel('catalog/product')->getCollection();
         if($since != 'ALL'){    
@@ -241,6 +246,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
     $magentoVersion = Mage::getVersion();
     $moduleversion = (String)Mage::getConfig()->getNode()->modules->MocoInsight_Mocoauto->version;
     $phpversion = phpversion();
+    $magentoedition = (String)Mage::getEdition();
 
     $stats = array(
         'success' => 'true',
@@ -255,6 +261,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         'Cart and Coupon rules' => $rulescount,
         'System Date Time' => $currentSystemTime,
         'Magento Version' => $magentoVersion,
+        'Magento Edition' => $magentoedition,
         'MocoAPI Version' => apiversion,
         'Module Version' => $moduleversion,
         'PHP Version' => $phpversion,
@@ -267,7 +274,6 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             ->setHeader('Content-type', 'application/json', true);
         return $this;
     }
-
 
     public function logstatsAction()   // Return the number size of logs
     {
@@ -363,8 +369,27 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
+    public function order_idsAction()
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
 
-    public function ordersAction()
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+
+        $orderIds = Mage::getModel('sales/order')->getCollection()->getAllIds($limit= $page_size, $offset =($offset * $page_size));
+
+        $this->getResponse()
+            ->setBody(json_encode($orderIds))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
+    public function ordersNoPaymentAction() // Made for Trollweb customer testing.
     {
         if(!$this->_authorise()) {
             return $this;
@@ -379,7 +404,6 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $_orderCol = Mage::getModel('sales/order')->getCollection()->addAttributeToSelect('*');
 
-
         if($since != 'ALL'){    
             $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
@@ -392,28 +416,20 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
         }
 
-        //Mage::log('SQL Query: '.$_orderCol->getSelect());
-
-
         $orders = array();
 
         foreach($_orderCol as $_order) {
+ 
+            $order = array();
 
             try{
-                $order = array();
                 $order['moco_start_of_order_record'] = 'True';
                 $orderdetails = array();
                 $orderdetails = $_order->toArray();
+
                 foreach ($orderdetails as $key => $value) {
                     $order[$key] = $value;
                 }
-                $order['payment_method'] = $_order->getPayment()->getMethodInstance()->getTitle();
-
-// Removing Tax Class as the customer really wanted VAT number 
-//                $_quote = Mage::getModel('sales/quote')->load($_order->getQuoteId());
-//                $taxClassId = $_quote->getCustomerTaxClassId();
-//                $_taxClass = Mage::getModel('tax/class')->load($taxClassId);
-//                $order['moco_customer_tax_class'] = $_taxClass->getClassName();
 
                 if(is_object($_order->getBillingAddress())){
                     $_billing_address = $_order->getBillingAddress();
@@ -437,14 +453,12 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                 }
                 $order['moco_tls'] = $orderitems;
 
-
                 $order['moco_end_of_order_record'] = 'True';
             }
             catch (Exception $e) {
                 $order['mocoauto_api_error'] = 'order record: ' . $e->getMessage();
             }
             $orders[] = $order;
-
         }
 
         $this->getResponse()
@@ -499,6 +513,96 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
+    public function ordersAction() 
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since','ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
+
+        $_orderCol = Mage::getModel('sales/order')->getCollection()->addAttributeToSelect('*');
+
+
+        if($since != 'ALL'){    
+            $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+
+        if($gTE != 'ALL'){
+            $_orderCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));
+            $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('entity_id');
+        }
+        else{
+            $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
+        }
+
+        //Mage::log('SQL Query: '.$_orderCol->getSelect());
+
+
+        $orders = array();
+
+        foreach($_orderCol as $_order) {
+ 
+            $order = array();
+
+            try{
+                $order['moco_start_of_order_record'] = 'True';
+                $orderdetails = array();
+                $orderdetails = $_order->toArray();
+                foreach ($orderdetails as $key => $value) {
+                    $order[$key] = $value;
+                }
+                if(is_object($_order->getPayment()) && method_exists($_order->getPayment()->getMethodInstance(), 'getTitle')){
+                    $order['payment_method'] = $_order->getPayment()->getMethodInstance()->getTitle();
+                }
+                else{
+                    $order['payment_method'] = 'Unable to get payment_method';
+                }
+
+                if(is_object($_order->getBillingAddress())){
+                    $_billing_address = $_order->getBillingAddress();
+                    $billaddrdetails = array();
+                    $billaddrdetails[] = $_billing_address->toArray();
+                    $order['moco_address'] = $billaddrdetails;
+                }
+
+                if(is_object($_order->getShippingAddress())){
+
+                    $_shipping_address = $_order->getShippingAddress();
+                    $shipaddrdetails = array();
+                    $shipaddrdetails[] = $_shipping_address->toArray();
+                    $order['moco_ship_address'] = $shipaddrdetails;
+                }
+
+                $_orderItemsCol = $_order->getItemsCollection();
+                $orderitems = array();
+                foreach($_orderItemsCol as $_orderitem){
+                    $orderitems[] = $_orderitem->toArray();
+                }
+                $order['moco_tls'] = $orderitems;
+
+
+                $order['moco_end_of_order_record'] = 'True';
+            }
+            catch (Exception $e) {
+                $order['mocoauto_api_error'] = 'order record: ' . $e->getMessage();
+            }
+            $orders[] = $order;
+
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($orders))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
 
     public function eavinfo_catalogAction()
     {
@@ -520,7 +624,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
   
-    public function attrInfoAction()
+    public function attrinfoAction()
     {
         if(!$this->_authorise()) {
             return $this;
@@ -541,7 +645,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
     }
 
 
-    public function entityTypeInfoAction()
+    public function entitytypeinfoAction()
     {
         $tablename = 'eav_entity_type';     // Set the table name here
 
@@ -567,6 +671,27 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $this->getResponse()
             ->setBody(json_encode($readresults))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
+    public function customer_idsAction()
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+
+        Mage::app()->setCurrentStore(Mage_Core_Model_App::ADMIN_STORE_ID);
+        $customerIds = Mage::getModel('customer/customer')->getCollection()->getAllIds($limit= $page_size, $offset =($offset * $page_size));
+
+        $this->getResponse()
+            ->setBody(json_encode($customerIds))
             ->setHttpResponseCode(200)
             ->setHeader('Content-type', 'application/json', true);
         return $this;
@@ -716,7 +841,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
     }
 
 
-    public function exproductsAction()
+    public function ex_productsAction()
     {
         if(!$this->_authorise()) {
             return $this;
@@ -849,6 +974,28 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             ->setHeader('Content-type', 'application/json', true);
         return $this;
     }
+
+    public function product_idsAction()
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+
+        Mage::app()->setCurrentStore(Mage_Core_Model_App::ADMIN_STORE_ID);
+        $productIds = Mage::getModel('catalog/product')->getCollection()->getAllIds($limit= $page_size, $offset =($offset * $page_size));
+
+        $this->getResponse()
+            ->setBody(json_encode($productIds))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
 
     public function productsAction()
     {
@@ -1182,7 +1329,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
             ->setHeader('Content-type', 'application/json', true);
         return $this;
     }
-    public function exlog_all_joinedAction()
+    public function ex_log_all_joinedAction()
     {
         $tablename1 = 'log_url';
         $tablename2 = 'log_url_info';
@@ -1381,7 +1528,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
-    public function exsubscribersAction()
+    public function ex_subscribersAction()
     {
         if(!$this->_authorise()) {
             return $this;
@@ -1504,19 +1651,28 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1'); // 1 = quote has not been conveted to an order
 
+        $magentoVersion = Mage::getVersion();
+        if (version_compare($magentoVersion, '1.7', '>=')){
+            //Mage::log("Version is above check"); 
+            $aboveVersion17Flag = 1;
+        } 
+        else {
+            //Mage::log("Version is below check");             
+            $aboveVersion17Flag = 0;
+        }
 
-        $_cartsCol->addFieldToFilter(                                     // If there is no email or customer id we dont want the cart.
+        if($aboveVersion17Flag){                                          // This will only work with Magento > 1.6
+            $_cartsCol->addFieldToFilter(                                 // If there is no email or customer id we dont want the cart.
                         array(
                             'customer_id',                                //attribute_1 with key 0
                             'customer_email',                             //attribute_2 with key 1
                         ),
                         array(
-                   //         array('neq'=>null),                         //condition for attribute_1 with key 0
-                   //         array('neq'=>null),                         //condition for attribute_2
                               array('notnull'=>1),                        // This form creates a NOT NULL query. 
                               array('notnull'=>1),
                         )
                     );
+        }
 
         $_cartsCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
@@ -1527,6 +1683,8 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
            $_cartsCol->addFieldToFilter('items_count', array('neq' => 0));     // If date filter supplied only include carts with items
         }
 
+        // If using gte we want to sort by entity id
+       
         if($gTE != 'ALL'){
            $_cartsCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));    // If gte set include records GTE gte
         }
@@ -1537,24 +1695,187 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
 
         foreach($_cartsCol as $_cart) {
-            try {
-                $carts[] = array('moco_start_of_cart_record' => 'True');
-                $carts[] = $_cart->toArray();
-                $_cartItemsCol = $_cart -> getItemsCollection();
+            $cart = array();
 
-                foreach($_cartItemsCol as $_cartitem){
-                    $carts[] = array('product_id'  => $_cartitem->getProductId());
-                    $carts[] = array('product_sku'  => $_cartitem->getSku());
-                    $carts[] = array('product_qty' => $_cartitem->getQty());
-                    $carts[] = array('updated_at'  => $_cartitem->getUpdatedAt());
-                    $carts[] = array('product_type' => $_cartitem->getProductType());
-                    //$carts[] = $_cartitem->toArray();
+            try {
+                $cart['moco_start_of_cart_record'] = 'True';
+                $cartdetails = array();
+
+                if(!$aboveVersion17Flag && !$_cart->getCustomerId() && !$_cart->getCustomerEmail()){
+                    //Mage::log($_cart->getEntityId() . " " . $_cart->getCustomerEmail() . " " .  $_cart->getCustomerId());
+                    $cart['moco_no_cart_identification_information'] = 'True';
                 }
-                $carts[] = array('moco_end_of_cart_record' => 'True');
+                else{
+                    $cartdetails = $_cart->toArray();
+
+                    foreach ($cartdetails as $key =>$value){
+                        $cart[$key] = $value;
+                    }
+
+                    $_cartItemsCol = $_cart -> getItemsCollection();
+                    $cartitems = array();
+
+                    foreach($_cartItemsCol as $_cartitem){
+                        $cartitem = array();
+                        try{
+                            $cartitem['item_id']              = $_cartitem->getItemId();
+                            $cartitem['parent_id']            = $_cartitem->getParentId();
+                            $cartitem['product_id']           = $_cartitem->getProductId();
+                            $cartitem['product_sku']          = $_cartitem->getSku();
+                            $cartitem['product_qty']          = $_cartitem->getQty();
+                            $cartitem['updated_at']           = $_cartitem->getUpdatedAt();
+                            $cartitem['product_name']         = $_cartitem->getName();
+                            $cartitem['product_type']         = $_cartitem->getProductType();
+                            $cartitem['base_price']           = $_cartitem->getBasePrice();
+                            $cartitem['base_tax_amount']      = $_cartitem->getBaseTaxAmount();
+                            $cartitem['base_discount_amount'] = $_cartitem->getBaseDiscountAmount();
+                            $cartitem['base_cost']            = $_cartitem->getBaseCost();
+                            $cartitem['base_price_incl_tax']  = $_cartitem->getBasePriceInclTax();
+                        }
+                        catch(Exception $e) {
+                            $cartitem['mocoauto_api_error'] = 'moco_unable_to_read_cartitem: ' . $e->getMessage();
+                        }
+
+                        $cartitems[] = $cartitem;
+                    }
+ 
+                    $cart['moco_cart_items'] = $cartitems;
+                }
+
+                $cart['moco_end_of_cart_record'] = 'True';
+
             }
             catch(Exception $e) {
-                    $carts[] = array('mocoauto_api_error' => 'moco_unable_to_read_cart: ' . $e->getMessage());
+                $cart['mocoauto_api_error'] = 'moco_unable_to_read_cart: ' . $e->getMessage();
             }
+
+            $carts[] = $cart;
+
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($carts))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+    public function test_unconvertedcartsAction()
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since', 'ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
+
+        $_cartsCol = Mage::getResourceModel('sales/quote_collection')->addFieldToFilter('is_active', '1'); // 1 = quote has not been conveted to an order
+
+        $magentoVersion = Mage::getVersion();
+        if (version_compare($magentoVersion, '1.7', '>=')){
+            //Mage::log("Version is above check"); 
+            $aboveVersion17Flag = 1;
+        } 
+        else {
+            //Mage::log("Version is below check");             
+            $aboveVersion17Flag = 0;
+        }
+
+        if($aboveVersion17Flag){                                          // This will only work with Magento > 1.6
+            $_cartsCol->addFieldToFilter(                                 // If there is no email or customer id we dont want the cart.
+                        array(
+                            'customer_id',                                //attribute_1 with key 0
+                            'customer_email',                             //attribute_2 with key 1
+                        ),
+                        array(
+                              array('notnull'=>1),                        // This form creates a NOT NULL query. 
+                              array('notnull'=>1),
+                        )
+                    );
+        }
+
+        if($since != 'ALL'){
+            $_cartsCol->addFieldToFilter('updated_at', array('gteq' =>$since)); // If no date filter include empty carts
+        }
+        else{
+           $_cartsCol->addFieldToFilter('items_count', array('neq' => 0));     // If date filter supplied only include carts with items
+        }
+
+        // If using gte we want to sort by entity id
+       
+        if($gTE != 'ALL'){
+           $_cartsCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));    // If gte set include records GTE gte
+           $_cartsCol->getSelect()->limit($page_size, ($offset * $page_size))->order('entity_id');
+        }
+        else{
+           $_cartsCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
+        }
+
+        //Mage::log((string) $_cartsCol->getSelect());
+
+        $carts = array();
+
+
+        foreach($_cartsCol as $_cart) {
+            $cart = array();
+
+            try {
+                $cart['moco_start_of_cart_record'] = 'True';
+                $cartdetails = array();
+
+                if(!$aboveVersion17Flag && !$_cart->getCustomerId() && !$_cart->getCustomerEmail()){
+                    //Mage::log($_cart->getEntityId() . " " . $_cart->getCustomerEmail() . " " .  $_cart->getCustomerId());
+                    $cart['moco_no_cart_identification_information'] = 'True';
+                }
+                else{
+                    $cartdetails = $_cart->toArray();
+
+                    foreach ($cartdetails as $key =>$value){
+                        $cart[$key] = $value;
+                    }
+
+                    $_cartItemsCol = $_cart -> getItemsCollection();
+                    $cartitems = array();
+
+                    foreach($_cartItemsCol as $_cartitem){
+                        $cartitem = array();
+                        try{
+                            $cartitem['item_id']              = $_cartitem->getItemId();
+                            $cartitem['parent_id']            = $_cartitem->getParentId();
+                            $cartitem['product_id']           = $_cartitem->getProductId();
+                            $cartitem['product_sku']          = $_cartitem->getSku();
+                            $cartitem['product_qty']          = $_cartitem->getQty();
+                            $cartitem['updated_at']           = $_cartitem->getUpdatedAt();
+                            $cartitem['product_name']         = $_cartitem->getName();
+                            $cartitem['product_type']         = $_cartitem->getProductType();
+                            $cartitem['base_price']           = $_cartitem->getBasePrice();
+                            $cartitem['base_tax_amount']      = $_cartitem->getBaseTaxAmount();
+                            $cartitem['base_discount_amount'] = $_cartitem->getBaseDiscountAmount();
+                            $cartitem['base_cost']            = $_cartitem->getBaseCost();
+                            $cartitem['base_price_incl_tax']  = $_cartitem->getBasePriceInclTax();
+                        }
+                        catch(Exception $e) {
+                            $cartitem['mocoauto_api_error'] = 'moco_unable_to_read_cartitem: ' . $e->getMessage();
+                        }
+
+                        $cartitems[] = $cartitem;
+                    }
+ 
+                    $cart['moco_cart_items'] = $cartitems;
+                }
+
+                $cart['moco_end_of_cart_record'] = 'True';
+
+            }
+            catch(Exception $e) {
+                $cart['mocoauto_api_error'] = 'moco_unable_to_read_cart: ' . $e->getMessage();
+            }
+
+            $carts[] = $cart;
+
         }
 
         $this->getResponse()
@@ -1564,7 +1885,8 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
-    public function exunconvertedcartsAction()//This query returns only no empty carts when no dat filter applied
+
+    public function ex_unconvertedcartsAction()//This query returns only no empty carts when no dat filter applied
     {
         if(!$this->_authorise()) {
             return $this;
@@ -1624,6 +1946,66 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
     }
 
     public function wishlistsAction()
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since', 'ALL');
+        $gTE = $this->getRequest()->getParam('gte', 'ALL');
+
+        $_wishlistCol = Mage::getModel('wishlist/wishlist')-> getCollection();
+
+        if($since != 'ALL'){
+           $_wishlistCol->addFieldToFilter('updated_at', array('gteq' =>$since));
+        }
+
+        if($gTE != 'ALL'){
+            $_wishlistCol->addFieldToFilter('wishlist_id', array('gteq' =>$gTE));
+            $_wishlistCol->getSelect()->limit($page_size, ($offset * $page_size))->order('wishlist_id');
+        }
+        else{
+            $_wishlistCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
+        }
+
+        $wishlists = array();
+
+        foreach($_wishlistCol as $_wishlist) {
+            $wishlist = array();
+            $wishlist['moco_start_of_wishlist_record'] = 'True';
+            $wishlist['wishlist_id'] = $_wishlist->getId();
+            $wishlist['customer_id'] = $_wishlist->getCustomerId();
+            $wishlist['updated_at'] = $_wishlist->getUpdatedAt();
+            $_wishlistitemsCol = $_wishlist->getItemCollection();
+            $wishlistitems = array();
+
+            foreach($_wishlistitemsCol as $_wishlistitem){
+                $wishlistitem = array();
+                $wishlistitem['item_id'] = $_wishlistitem->getId();
+                $wishlistitem['store_id'] = $_wishlistitem->getStoreId();
+                $wishlistitem['product_id'] = $_wishlistitem->getProductId();
+                $wishlistitem['product_qty'] = $_wishlistitem->getQty();
+                $wishlistitem['added_at'] = $_wishlistitem->getAddedAt();
+                $wishlistitems[] = $wishlistitem;
+            }
+
+            $wishlist['wish_list_items'] = $wishlistitems;            
+            $wishlist['moco_end_of_wishlist_record'] = 'True';
+            $wishlists[] = $wishlist;
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($wishlists))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
+    public function ex_wishlistsAction()
     {
         if(!$this->_authorise()) {
             return $this;
