@@ -1,0 +1,95 @@
+<?xml version="1.0"?>
+<package>
+    <name>MocoInsight_Mocoauto</name>
+    <version>1.2.7</version>
+    <stability>stable</stability>
+    <license>OSL v1.0.0</license>
+    <channel>community</channel>
+    <extends/>
+    <summary>API plugin for mocoinsight</summary>
+    <description>This plugin provides sucure API access for mocoinsight.com - Advanced Magento Reporting&#xD;
+&#xD;
+&#xD;
+</description>
+    <notes>1.2.7&#xD;
+&#xD;
+log stats function calculates using direct SQL&#xD;
+&#xD;
+&#xD;
+1.2.6&#xD;
+&#xD;
+StatsAction now returns size of log files&#xD;
+&#xD;
+------------------------------------------------------------&#xD;
+1.2.5&#xD;
+&#xD;
+Speed up stocklevelAction, now only returns non zero inventory&#xD;
+&#xD;
+WishlistAction now includes wishListItemId&#xD;
+&#xD;
+-------------------------------------------------------------&#xD;
+1.2.4&#xD;
+&#xD;
+Added wishlistsAction&#xD;
+Added unconvertedcartsAction&#xD;
+&#xD;
+Fix - log actions now check if table exists&#xD;
+&#xD;
+----------------------------------------------------------------&#xD;
+1.2.3&#xD;
+&#xD;
+Fix to Observer.php&#xD;
+-------------------------------------------------------------&#xD;
+1.2.2&#xD;
+&#xD;
+Added subscribersAction&#xD;
+Added storesAction&#xD;
+&#xD;
+--------------------------------------------------------------&#xD;
+1.2.1&#xD;
+&#xD;
+ordersAction - now uses billing address as some products (Virtual) won't have a delivery address and checks that object exists&#xD;
+&#xD;
+&#xD;
+&#xD;
+&#xD;
+&#xD;
+---------------------------------------------------------------&#xD;
+1.2.0&#xD;
+&#xD;
+ordersAction - added shpping address&#xD;
+productsAction - added end of record marker&#xD;
+&#xD;
+stocklevelsAction - New&#xD;
+&#xD;
+Added log_ actions&#xD;
+&#xD;
+----------------------------------------------------------------&#xD;
+1.1.7&#xD;
+&#xD;
+Added malformed error&#xD;
+&#xD;
+Returns API version number with failed calls&#xD;
+----------------------------------------------------------------&#xD;
+1.1.6&#xD;
+&#xD;
+Changed API header name to work with sites that use additional authorisation now:&#xD;
+&#xD;
+mocoapi: apikey= THE API KEY&#xD;
+&#xD;
+&#xD;
+----------------------------------------------------------------&#xD;
+1.1.5&#xD;
+Updated stats API now includes:&#xD;
+&#xD;
+Version of magento&#xD;
+System date/time&#xD;
+added success true for succesful requests&#xD;
+changed product category to moco_category</notes>
+    <authors><author><name>Rob Davies</name><user>mocoinsight</user><email>rob.davies@mocoinsight.com</email></author></authors>
+    <date>2014-02-12</date>
+    <time>03:06:22</time>
+    <contents><target name="magecommunity"><dir name="MocoInsight"><dir name="Mocoauto"><dir><dir name="Block"><dir name="Adminhtml"><dir name="Config"><dir name="Buttons"><file name="Generate.php" hash="7690d026d99e31732279e6aa5b6b1def"/></dir></dir><file name="Menu.php" hash="1017af5f89545915f3f28be637e07a0c"/></dir></dir><dir name="Helper"><file name="Data.php" hash="4b53061397fec9446830ef218aba4055"/><file name="JWT.php" hash="6610b92191eccedb8edcf993730c3dc0"/></dir><dir name="Model"><file name="Observer.php" hash="c2cc2f396fedd682268457d17dd045b1"/><dir name="Source"><file name="Views.php" hash="c1ddaf4c7bb51c3907dd72b4e21b1897"/></dir></dir><dir name="controllers"><dir name="Adminhtml"><file name="MocoautoController.php" hash="6665fb22806ef20ee59e88a638ca6359"/></dir><file name="ApiController.php" hash="380664bbd46290c4b697ec14cf56838d"/><file name=".ApiController.php.swp" hash="02ad5d9cc02dbbeca8812f2ca95b30cf"/></dir><dir name="etc"><file name="config.xml" hash="9d14d02edf850e9b3c98885dff4fa509"/><file name="system.xml" hash="5d86b7d939b85826c7ac4d4496f80900"/></dir></dir></dir></dir></target><target name="magedesign"><dir name="adminhtml"><dir name="default"><dir name="default"><dir name="layout"><file name="mocoauto.xml" hash="7dd142354c78e773490c552bbcc3b408"/></dir><dir name="template"><dir name="mocoauto"><dir><dir name="config"><file name="button-generate.phtml" hash="d2ff89c8f1f78e748ac998bd13e61750"/><file name="link.phtml" hash="75c61cac6bdd33ed914f8618b5698598"/></dir></dir></dir></dir></dir></dir></dir><dir name="frontend"><dir name="base"><dir name="default"><dir name="layout"><file name="mocoauto.xml" hash="a12a0e1dc675b9ac675181373299e36a"/></dir></dir></dir></dir></target><target name="mageetc"><dir name="modules"><file name="MocoInsight_Mocoauto.xml" hash="1ec387f21726f6c7ea3ea216c47340d9"/></dir></target><target name="magelocale"><dir name="en_US"><file name="MocoInsight_Mocoauto.csv" hash="9b508561f871f93fa3158014baebf02b"/></dir></target><target name="mageskin"><dir name="adminhtml"><dir name="default"><dir name="default"><dir name="mocoauto"><file name="button.png" hash="58e62edb7f4be46e3b29c0bb774c7ad7"/><file name="icon.png" hash="b5bfce535c987d1e9e604823ac4b3943"/><file name="mocoauto.css" hash="3cd28072e5c2f2b656dd04c06288165b"/></dir></dir></dir></dir></target></contents>
+    <compatible/>
+    <dependencies><required><php><min>5.2.0</min><max>6.0.0</max></php></required></dependencies>
+</package>

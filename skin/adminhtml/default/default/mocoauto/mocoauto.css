@@ -1,0 +1,17 @@
+
+ul.tabs a.mocoauto-section,
+ul.tabs a.mocoauto-section:hover {
+    border-bottom: 1px solid #BEBEBE;
+    padding: 0.5em 0.5em 0 1.5em;
+    text-indent: -9999px;
+}
+
+ul.tabs a.mocoauto-section.active, 
+ul.tabs a.mocoauto-section.active:hover {
+    background: none repeat scroll 0 0 white;
+}
+
+button.mocoauto span {
+    background-image: url("button.png");
+    padding-left: 16px;
+}
