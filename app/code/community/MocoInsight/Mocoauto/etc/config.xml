@@ -4,7 +4,7 @@
 <config>
     <modules>
         <MocoInsight_Mocoauto>
-            <version>1.4.1</version>
+            <version>1.4.3</version>
         </MocoInsight_Mocoauto>
     </modules>
     <global>

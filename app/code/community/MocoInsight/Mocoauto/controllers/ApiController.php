@@ -1,5 +1,4 @@
 <?php
-//  Version 1.2.7
 //
 //  Make sure you update version in /var/www/html/app/code/community/MocoInsight/Mocoauto/etc/config.xml
 //
@@ -27,16 +26,17 @@
 //  installinfoAction
 //  rulesAction
 //  eavinfo_catalogAction
+//  attrInfoAction
+//  entityTypeInfoAction
 
+
+define("apiversion","1.4.3");
 
 class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Action
 {
 
     public function _authorise()
     {
-
-        $apiversion = (String)Mage::getConfig()->getNode()->modules->MocoInsight_Mocoauto->version;
-
         $tokenString = $this->getRequest()->getHeader('mocoapi');
 
         $token = null;
@@ -51,7 +51,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
         if(!Mage::getStoreConfig('mocoauto/api/enabled')) {
                 $this->getResponse()
-                    ->setBody(json_encode(array('success' => false, 'message' => 'API access disabled', 'MocoAPI version' => $apiversion)))
+                    ->setBody(json_encode(array('success' => false, 'message' => 'API access disabled', 'MocoAPI version' =>apiversion)))
                     ->setHttpResponseCode(403)
                     ->setHeader('Content-type', 'application/json', true);
                 return false;
@@ -60,7 +60,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         // Check the token passed in the header
         if(!$token || $token != $apiToken) {
                 $this->getResponse()
-                    ->setBody(json_encode(array('success' => false, 'message' => 'Not authorised','MocoAPI version' => $apiversion)))
+                    ->setBody(json_encode(array('success' => false, 'message' => 'Not authorised','MocoAPI version' => apiversion)))
                     ->setHttpResponseCode(401)
                     ->setHeader('Content-type', 'application/json', true);
                 return false;
@@ -143,7 +143,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
 
     $magentoVersion = Mage::getVersion();
-    $apiversion = (String)Mage::getConfig()->getNode()->modules->MocoInsight_Mocoauto->version;
+    $moduleversion = (String)Mage::getConfig()->getNode()->modules->MocoInsight_Mocoauto->version;
     $phpversion = phpversion();
 
     $stats = array(
@@ -159,7 +159,8 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         'Cart and Coupon rules' => $rulescount,
         'System Date Time' => $currentSystemTime,
         'Magento Version' => $magentoVersion,
-        'MocoAPI Version' => $apiversion,
+        'MocoAPI Version' => apiversion,
+        'Module Version' => $moduleversion,
         'PHP Version' => $phpversion,
         'API processing time' => (microtime(true) - $time_start)
          );
@@ -439,12 +440,14 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $_orderCol = Mage::getModel('sales/order')->getCollection()->addAttributeToSelect('*');
         $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
 
+    //    Mage::log('SQL Query: '.$_orderCol->getSelect());
+
         if($since != 'ALL'){    
             $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
         }
 
         if($gTE != 'ALL'){
-            $_orderCol->addFieldToFilter('entity_id', array('gteq' =>$gTE));
+            $_orderCol->addAttributeToFilter('entity_id', array('gteq' =>$gTE));
         }
 
         $orders = array();
@@ -567,6 +570,57 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
   
+    public function attrInfoAction()
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $eavinfo = array();
+
+        $attributeCollection = Mage::getResourceModel('eav/entity_attribute_collection'); //->setEntityTypeFilter(4);
+        foreach($attributeCollection as $attributeObject){
+            $eavinfo[] = $attributeObject->getData();
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($eavinfo))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
+
+    public function entityTypeInfoAction()
+    {
+        $tablename = 'eav_entity_type';     // Set the table name here
+
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 200);
+        $since = $this->getRequest()->getParam('since', 'ALL');
+
+        $_read = Mage::getSingleton('core/resource')->getConnection('core_read');
+
+        if(!$_read ->isTableExists($tablename)){    //Table does not exist
+            $readresults=array($tablename ." table does not exist");
+        }
+        else{
+            $query = 'select * from ' . $tablename . ' limit ' . $offset . ',' . $page_size;
+            $readresults = $_read->fetchAll($query);
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($readresults))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
 
     public function customersAction()
     {
@@ -700,112 +754,6 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         return $this;
     }
 
-    public function exproductsAction()
-    {
-        if(!$this->_authorise()) {
-            return $this;
-        }
-
-        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
-
-        $offset = $this->getRequest()->getParam('offset', 0);
-        $page_size = $this->getRequest()->getParam('page_size', 20);
-        $since = $this->getRequest()->getParam('since', 'ALL');
-
-        $_productCol = Mage::getModel('catalog/product')->getCollection()->addAttributeToSelect('*');
-        $_productCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
-
-        if($since != 'ALL'){    
-           $_productCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
-        }
-
-        $products[] = array('success' => 'true');        
-
-        foreach($_productCol as $_product){
-
-// get all the attributes of the product
-            $attributes = $_product->getAttributes();
-        
-            foreach ($attributes as $attribute) {      
-                $attributeCode = $attribute->getAttributeCode();        
-                try {
-                    $value = $attribute->getFrontend()->getValue($_product);
-
-                    switch ($attributeCode){
-                        case 'in_depth':
-			    break;
-                        case 'description':
-                            break;
-                        case 'short_description':
-                            break;
-                        default:
-                            $products[] = array($attributeCode => $value);
-                            break;
-                    }
-                }
-                catch (Exception $e) {
-                    $products[] = array('mocoauto_api_error' => 'product attribute ' . $attributeCode . ' ' . $e->getMessage());
-                }
-            }   
-        
-
-// get all the categories of the product
-
-            $categories = $_product->getCategoryCollection()->addAttributeToSelect('name');
-        
-            foreach ($categories as $category) {      
-                $products[] = array('moco_category' => $category->getID());
-            }
-
-// get inventory information
-
-            try{
-                $stock = Mage::getModel('cataloginventory/stock_item')->loadByProduct($_product);
-
-                $products[] = array('stock_managed' => $stock->getManageStock());
-                $products[] = array('stock_availability' => $stock->getIsInStock());
-            }
-            catch (Exception $e) {
-                $products[] = array('mocoauto_api_error' => 'moco_product_inventory: ' . $e->getMessage());
-            }
-
-
-// if type is configurable get simple product children
-
-            if($_product->getTypeID() == 'configurable'){
-                //$assocProducts = Mage::getModel('catalog/product_type_configurable')->getUsedProducts(null,$_product);
-                $assocProducts = $_product->getTypeInstance()->getUsedProducts();
-
-                foreach($assocProducts as $assocProduct){
-                    $products[] = array('childProductID' => $assocProduct->getID());
-                }  
-            }
-
-// if type is grouped get associated product children
-
-            if($_product->getTypeID() == 'grouped'){
-
-                $groupedProducts = $_product->getTypeInstance(true)->getAssociatedProducts($_product);
-
-                foreach($groupedProducts as $groupedProduct){
-                    $products[] = array('childProductID' => $groupedProduct->getID());
-
-                }  
-            }
-
-
-// write end of record mark
-           $products[] = array('moco_end_of_record' => 'True');
-
-        }
-        
-        $this->getResponse()
-            ->setBody(json_encode(array('products' => $products)))
-            ->setHttpResponseCode(200)
-            ->setHeader('Content-type', 'application/json', true);
-        return $this;
-    }
-
 
     public function productsAction()
     {
@@ -900,7 +848,6 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                 $products[] = array('mocoauto_api_error' => 'moco_product_inventory: ' . $e->getMessage());
             }
 
-
 // if type is configurable get simple product children
 
             if($_product->getTypeID() == 'configurable'){
@@ -923,9 +870,6 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
                 }  
             }
-
-
-
 
 // write end of record mark
            $products[] = array('moco_end_of_record' => 'True');
@@ -1462,7 +1406,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                             'customer_email',                             //attribute_2 with key 1
                         ),
                         array(
-                            array('neq'=>Null),                           //condition for attribute_1 with key 0
+                            array('neq'=>null),                           //condition for attribute_1 with key 0
                             array('neq'=>null),                           //condition for attribute_2
                         )
                     );
