@@ -423,6 +423,77 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
         $orders = array();
 
         foreach($_orderCol as $_order) {
+
+            try{
+                $orders[] = array('moco_start_of_order_record' => 'True');
+                $orders[] = $_order->toArray();
+
+                if(is_object($_order->getBillingAddress())){
+
+                    $_billing_address = $_order->getBillingAddress();
+                    $orders[] = array('moco_start_of_address' => 'True');
+                    $orders[] = $_billing_address->toArray();
+                    $orders[] = array('moco_end_of_address' => 'True');
+                }
+
+                try{
+                    $_payment_info = $_order->getPayment();
+                    $orders[] = array('moco_start_of_paymentinfo' => 'True');
+                    $paymentinfo[] = $_payment_info->toArray();
+		    foreach($paymentinfo as $key => $value){
+                        unset($paymentinfo[$key]['cc_number_enc']);
+                        unset($paymentinfo[$key]['cc_last4']);
+                        unset($paymentinfo[$key]['cc_exp_month']);
+                        unset($paymentinfo[$key]['cc_exp_year']);
+                    }
+                    $orders[] = array($paymentinfo);
+
+                    $orders[] = array('moco_end_of_paymentinfo' => 'True');
+                }
+                catch (Exception $e) {
+                    $orders[] = array('billing info' => 'Mocoauto_error: ' . $e->getMessage());
+                } 
+                $_orderItemsCol = $_order->getItemsCollection();
+
+                foreach($_orderItemsCol as $_orderitem){
+                    $orders[] = $_orderitem->toArray();
+                } 
+                $orders[] = array('moco_end_of_order_record' => 'True');
+            }
+            catch (Exception $e) {
+                $orders[] = array('order record' => 'Mocoauto_error: ' . $e->getMessage());
+            }
+        }
+
+        $this->getResponse()
+            ->setBody(json_encode($orders))
+            ->setHttpResponseCode(200)
+            ->setHeader('Content-type', 'application/json', true);
+        return $this;
+    }
+
+    public function exordersAction()
+    {
+        if(!$this->_authorise()) {
+            return $this;
+        }
+
+        $sections = explode('/', trim($this->getRequest()->getPathInfo(), '/'));
+
+        $offset = $this->getRequest()->getParam('offset', 0);
+        $page_size = $this->getRequest()->getParam('page_size', 20);
+        $since = $this->getRequest()->getParam('since','All');
+
+        $_orderCol = Mage::getModel('sales/order')->getCollection()->addAttributeToSelect('*');
+        $_orderCol->getSelect()->limit($page_size, ($offset * $page_size))->order('updated_at');
+
+        if($since != 'All'){
+            $_orderCol->addAttributeToFilter('updated_at', array('gteq' =>$since));
+        }
+
+        $orders = array();
+
+        foreach($_orderCol as $_order) {
             $orders[] = $_order->toArray();
 
 
@@ -569,6 +640,18 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                 $products[] = array('moco_category' => $category->getID());
             }
 
+// get inventory information
+
+            try{
+                $stock = Mage::getModel('cataloginventory/stock_item')->loadByProduct($_product);
+
+                $products[] = array('stock_managed' => $stock->getManageStock());
+                $products[] = array('stock_availability' => $stock->getIsInStock());
+            }
+            catch (Exception $e) {
+                $products[] = array('moco_product_inventory' => 'Mocoauto_error: ' . $e->getMessage());
+            }
+
 
 // if type is configurable get simple product children
 
@@ -588,7 +671,7 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
                 $groupedProducts = $_product->getTypeInstance(true)->getAssociatedProducts($_product);
 
                 foreach($groupedProducts as $groupedProduct){
-                    $products[] = array('ChildProductID' => $groupedProduct->getID());
+                    $products[] = array('childProductID' => $groupedProduct->getID());
 
                 }  
             }
@@ -1096,8 +1179,11 @@ class MocoInsight_Mocoauto_ApiController extends Mage_Core_Controller_Front_Acti
 
                 foreach($_cartItemsCol as $_cartitem){
                     $carts[] = array('product_id'  => $_cartitem->getProductId());
+                    $carts[] = array('product_sku'  => $_cartitem->getSku());
                     $carts[] = array('product_qty' => $_cartitem->getQty());
                     $carts[] = array('updated_at'  => $_cartitem->getUpdatedAt());
+                    $carts[] = array('product_type' => $_cartitem->getProductType());
+                    //$carts[] = $_cartitem->toArray();
                 }
                 $carts[] = array('moco_end_of_cart_record' => 'True');
             }
