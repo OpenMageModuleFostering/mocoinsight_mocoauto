@@ -1,16 +1,19 @@
 {
-    "name": "OpenMageModuleFostering/MocoInsight_Mocoauto",
+    "name": "OpenMageModuleFostering\/MocoInsight_Mocoauto",
     "type": "magento-module",
     "license": "OSL-v1.0.0",
     "homepage": "",
     "description": "API plugin for mocoinsight",
     "authors": [
-    {
-        "name": "Rob Davies",
-        "email": "rob.davies@mocoinsight.com"
-    }
-],
+        {
+            "name": "Rob Davies",
+            "email": "rob.davies@mocoinsight.com"
+        }
+    ],
     "suggest": {
-        "magento-hackathon/magento-composer-installer": "*"
-    }
+        "magento-hackathon\/magento-composer-installer": "*"
+    },
+    "keywords": [
+        "openmage-module"
+    ]
 }
